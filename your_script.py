@@ -470,6 +470,7 @@ async def evaluate_symbol(symbol):
     await send_to_discord(message)
 
 async def run_loop_forever():
+    await send_to_discord("💡 搜幣程式啟動！")
     while True:
         for sym in symbols:
             await evaluate_symbol(sym)
