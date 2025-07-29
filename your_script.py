@@ -391,7 +391,7 @@ symbols = [
     ]
 
 # 權重列表，對應指標順序：MA, BE_BIG, MACD, RSI, THREE, BREAK_OUT, KDJ
-weights = [3, 3, 2, 2, 1, 1, 1]
+weights = [3, 3, 2, 2, 1, 2, 1]
 
 skip_counts = {}  # 全域字典，記錄幣種跳過次數
 
@@ -488,10 +488,14 @@ async def evaluate_symbol(symbol):
     indicators_str = ", ".join(triggered_indicators) if triggered_indicators else "無"
 
     # 判斷進場方向
-    if total_score >= 5:
+    if total_score >= 6:
         direction = "📈 **看漲進場**"
-    elif total_score <= -5:
+    elif total_score <= -6:
         direction = "📉 **看跌進場**"
+    elif total_score >= 9:
+        direction = "📈!!!!看漲強力進場!!!!"
+    elif total_score <= -9:
+        direction = "📉!!!!看跌強力進場!!!!"
     else:
         return 0
     skip_counts[symbol] = 2
