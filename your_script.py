@@ -9,11 +9,11 @@ import aiohttp
 api_key = "L9ywGJGME1uqTkIRd1Od08IvXyWCCyA2YKGwMPnde8BWOmm8gAC5xCdGAZdXFWZMt1euiT574cgAvQdQTw"
 api_secret = "NYY1OfADXhu26a6F4Tw67RbHDvJcQ2bGOcQWOI1vXccWRoutdIdfsvxyxVtdLxZAGFYn9eYZN6RX7w2fQ"
 
-async def MA(t): #ma平均移動線*3
+async def MA(symbol,interval): #ma平均移動線*3
     async with BingXAsyncClient(api_key=api_key, api_secret=api_secret) as client:
         res = await client.swap.kline_candlestick_data(
-            symbol=t,
-            interval="1h",
+            symbol=symbol,
+            interval=interval,
             limit=500
         )
 
@@ -63,11 +63,11 @@ async def MA(t): #ma平均移動線*3
 
 
 
-async def BE_BIG(t): #成交量放大*3
+async def BE_BIG(symbol,interval): #成交量放大*3
     async with BingXAsyncClient(api_key=api_key, api_secret=api_secret) as client:
         res = await client.swap.kline_candlestick_data(
-            symbol=t,
-            interval="1h",
+            symbol=symbol,
+            interval=interval,
             limit=30
         )
 
@@ -108,11 +108,11 @@ async def BE_BIG(t): #成交量放大*3
         
         
         
-async def MACD(t): #MACD判斷*2
+async def MACD(symbol,interval): #MACD判斷*2
     async with BingXAsyncClient(api_key=api_key, api_secret=api_secret) as client:
         res = await client.swap.kline_candlestick_data(
-            symbol=t,
-            interval="1h",
+            symbol=symbol,
+            interval=interval,
             limit=300
         )
 
@@ -159,11 +159,11 @@ async def MACD(t): #MACD判斷*2
 
 
 
-async def RSI(t): #RSI*2
+async def RSI(symbol,interval): #RSI*2
     async with BingXAsyncClient(api_key=api_key, api_secret=api_secret) as client:
         res = await client.swap.kline_candlestick_data(
-            symbol=t,
-            interval="1h",
+            symbol=symbol,
+            interval=interval,
             limit=300
         )
 
@@ -234,11 +234,11 @@ async def RSI(t): #RSI*2
         return last_signal
 
 
-async def THREE(t): #三根陰陽線*1
+async def THREE(symbol,interval): #三根陰陽線*1
     async with BingXAsyncClient(api_key=api_key, api_secret=api_secret) as client:
         res = await client.swap.kline_candlestick_data(
-            symbol=t,
-            interval="1h",
+            symbol=symbol,
+            interval=interval,
             limit=10
         )
         data = [kline.__dict__ for kline in res.data]
@@ -279,11 +279,11 @@ async def THREE(t): #三根陰陽線*1
 
 
 
-async def BREAK_OUT(t): #價格突破阻力*1
+async def BREAK_OUT(symbol,interval): #價格突破阻力*1
     async with BingXAsyncClient(api_key=api_key, api_secret=api_secret) as client:
         res = await client.swap.kline_candlestick_data(
-            symbol=t,
-            interval="1h",
+            symbol=symbol,
+            interval=interval,
             limit=30  # 取30根足夠做10~20根區間判斷
         )
 
@@ -328,11 +328,11 @@ def calculate_kdj(df, n=9, k_period=3, d_period=3): #KDJ*1
     df['J'] = 3 * df['K'] - 2 * df['D']
     return df
 
-async def KDJ(t): #KDJ*1
+async def KDJ(symbol,interval): #KDJ*1
     async with BingXAsyncClient(api_key=api_key, api_secret=api_secret) as client:
         res = await client.swap.kline_candlestick_data(
-            symbol=t,
-            interval="1h",
+            symbol=symbol,
+            interval=interval,
             limit=200
         )
 
@@ -391,10 +391,10 @@ symbols = [
     ]
 
 # 權重列表，對應指標順序：MA, BE_BIG, MACD, RSI, THREE, BREAK_OUT, KDJ
-weights = [3, 3, 2, 2, 1, 2, 1]
+weights = [3, 3, 1.5, 2, 1, 1, 1]
 
-skip_counts = {}  # 全域字典，記錄幣種跳過次數
-
+skip_counts_1h = {}  # 全域字典，記錄幣種跳過次數
+skip_counts_15m = {}
 
 
 async def get_current_price(symbol):
@@ -458,22 +458,22 @@ async def send_to_discord(message: str):
                 text = await resp.text()
                 print(f"發送失敗，狀態碼：{resp.status}，訊息：{text}")
 
-async def evaluate_symbol(symbol):
+async def evaluate_symbol_1h(symbol):
 
     # 如果該幣跳過計數 > 0，直接跳過並扣減一次
-    if skip_counts.get(symbol, 0) > 0:
-        skip_counts[symbol] -= 1
-        print(f"跳過 {symbol} 偵測，剩餘跳過次數：{skip_counts[symbol]}")
+    if skip_counts_1h.get(symbol, 0) > 0:
+        skip_counts_1h[symbol] -= 1
+        print(f"跳過 {symbol} 偵測，剩餘跳過次數：{skip_counts_1h[symbol]}")
         return  # 不做評估
     indicators = ['MA', 'BE_BIG', 'MACD', 'RSI', 'THREE', 'BREAK_OUT', 'KDJ']
     scores = [
-        await MA(symbol),
-        await BE_BIG(symbol),
-        await MACD(symbol),
-        await RSI(symbol),
-        await THREE(symbol),
-        await BREAK_OUT(symbol),
-        await KDJ(symbol)
+        await MA(symbol,interval="1h"),
+        await BE_BIG(symbol,interval="1h"),
+        await MACD(symbol,interval="1h"),
+        await RSI(symbol,interval="1h"),
+        await THREE(symbol,interval="1h"),
+        await BREAK_OUT(symbol,interval="1h"),
+        await KDJ(symbol,interval="1h")
     ]
     total_score = sum(s * w for s, w in zip(scores, weights))
     current_price = await get_current_price(symbol)
@@ -488,17 +488,13 @@ async def evaluate_symbol(symbol):
     indicators_str = ", ".join(triggered_indicators) if triggered_indicators else "無"
 
     # 判斷進場方向
-    if total_score >= 6:
+    if total_score >= 5:
         direction = "📈 **看漲進場**"
-    elif total_score <= -6:
+    elif total_score <= -5:
         direction = "📉 **看跌進場**"
-    elif total_score >= 9:
-        direction = "📈!!!!看漲強力進場!!!!"
-    elif total_score <= -9:
-        direction = "📉!!!!看跌強力進場!!!!"
     else:
         return 0
-    skip_counts[symbol] = 2
+    skip_counts_1h[symbol] = 2
     
     # 處理ATR顯示
     atr_info = f"📏 ATR: {atr:,.3f}  " \
@@ -507,6 +503,7 @@ async def evaluate_symbol(symbol):
 
     # 組合訊息
     message = (
+        f"!!🚨注意🚨!! 🕐時區為1H🕐!!\n"
         f"{emoji} `{symbol}`\n"
         f"💰 現價：${current_price:,.2f}\n"
         f"📊 總分：{total_score}\n"
@@ -517,14 +514,87 @@ async def evaluate_symbol(symbol):
 
     await send_to_discord(message)
 
-async def run_loop_forever():
+
+async def evaluate_symbol_15m(symbol):
+
+    # 如果該幣跳過計數 > 0，直接跳過並扣減一次
+    if skip_counts_15m.get(symbol, 0) > 0:
+        skip_counts_15m[symbol] -= 1
+        print(f"跳過 {symbol} 偵測，剩餘跳過次數：{skip_counts_15m[symbol]}")
+        return  # 不做評估
+    indicators = ['MA', 'BE_BIG', 'MACD', 'RSI', 'THREE', 'BREAK_OUT', 'KDJ']
+    scores = [
+        await MA(symbol,interval="15m"),
+        await BE_BIG(symbol,interval="15m"),
+        await MACD(symbol,interval="15m"),
+        await RSI(symbol,interval="15m"),
+        await THREE(symbol,interval="15m"),
+        await BREAK_OUT(symbol,interval="15m"),
+        await KDJ(symbol,interval="15m")
+    ]
+    total_score = sum(s * w for s, w in zip(scores, weights))
+    current_price = await get_current_price(symbol)
+    atr = await ATR(symbol)
+
+    # 幣名簡化
+    short = symbol.split("-")[0]
+    emoji = emoji_map.get(short, "")
+    triggered_indicators = [name for name, score in zip(indicators, scores) if score != 0]
+
+    # 轉成字串（用逗號分隔）
+    indicators_str = ", ".join(triggered_indicators) if triggered_indicators else "無"
+
+    # 判斷進場方向
+    if total_score >= 5:
+        direction = "📈 **看漲進場**"
+    elif total_score <= -5:
+        direction = "📉 **看跌進場**"
+    else:
+        return 0
+    skip_counts_15m[symbol] = 2
+    
+    # 處理ATR顯示
+    atr_info = f"📏 ATR: {atr:,.3f}  " \
+               f"1.5: {atr*1.5:,.3f}  " \
+               f"3: {atr*3:,.3f}\n" if atr is not None else "📏 ATR: 無法計算\n"
+
+    # 組合訊息
+    message = (
+        f"!!🚨注意🚨!!🕐時區為15m🕐!!\n"
+        f"{emoji} `{symbol}`\n"
+        f"💰 現價：${current_price:,.2f}\n"
+        f"📊 總分：{total_score}\n"
+        f"{atr_info}"
+        f"{direction}\n"
+        f"📌 進場依據：{indicators_str}"
+    )
+
+    await send_to_discord(message)
+
+
+async def run_loop_1h():
     await send_to_discord("💡 搜幣程式啟動！")
     while True:
         for sym in symbols:
-            await evaluate_symbol(sym)
+            await evaluate_symbol_1h(sym)
             await asyncio.sleep(0.2)  # 每次發完訊息後等待0.2秒，避免限速
         print("等待 20 分鐘後重新判斷...\n")
         await asyncio.sleep(1200)  # 非同步等待20分鐘
 
+async def run_loop_15m():
+    while True:
+        for sym in symbols:
+            await evaluate_symbol_15m(sym)
+            await asyncio.sleep(0.2)  # 每次發完訊息後等待0.2秒，避免限速
+            
+        print("等待 5 分鐘後重新判斷...\n")
+        await asyncio.sleep(300)  # 非同步等待5分鐘
+        
+async def run_loop_forever():
+    await asyncio.gather(
+        run_loop_1h(),
+        run_loop_15m(),
+    )        
+
 if __name__ == "__main__":
-    asyncio.run(run_loop_forever())
+    asyncio.run(run_loop_1h())
