@@ -159,7 +159,7 @@ async def MACD(t): #MACD判斷*2
 
 
 
-async def RSI(t):  #RSI判斷*2
+async def RSI(t): #RSI*2
     async with BingXAsyncClient(api_key=api_key, api_secret=api_secret) as client:
         res = await client.swap.kline_candlestick_data(
             symbol=t,
@@ -187,25 +187,51 @@ async def RSI(t):  #RSI判斷*2
         rs = avg_gain / avg_loss
         df['RSI'] = 100 - (100 / (1 + rs))
 
-        # 訊號判斷
         df['signal'] = 0
-        # RSI 由低於30到高於30時視為買進訊號
-        df.loc[(df['RSI'] > 30) & (df['RSI'].shift(1) <= 30), 'signal'] = 1
-        # RSI 由高於70到低於70時視為賣出訊號
-        df.loc[(df['RSI'] < 70) & (df['RSI'].shift(1) >= 70), 'signal'] = -1
 
-        # 取最近兩根訊號
+        # 優先判斷穿越 20/80
+        df.loc[(df['RSI'] > 20) & (df['RSI'].shift(1) <= 20), 'signal'] = 2
+        df.loc[(df['RSI'] < 80) & (df['RSI'].shift(1) >= 80), 'signal'] = -2
+
+        # 再判斷穿越 30/70，且未被 20/80 訊號覆蓋才設定
+        df.loc[((df['RSI'] > 30) & (df['RSI'].shift(1) <= 30)) & (df['signal'] == 0), 'signal'] = 1
+        df.loc[((df['RSI'] < 70) & (df['RSI'].shift(1) >= 70)) & (df['signal'] == 0), 'signal'] = -1
+
+        # 取最後兩根訊號
         last_two = df['signal'].iloc[-2:]
-        signals = set(last_two.values)
 
-        if signals == {1}:
-            return 1
-        elif signals == {-1}:
-            return -1
-        elif signals == {1, -1}:
-            return 0  # 衝突訊號
-        else:
+        # 如果有 0 或兩根訊號不一樣，回傳 0
+        signals = set(last_two.values)
+        if 0 in signals or len(signals) > 1:
             return 0
+
+        last_signal = last_two.iloc[-1]
+
+        # 判斷背離 (最近20根)
+        window = 20
+        recent = df.tail(window)
+        close_vals = recent['close'].values
+        rsi_vals = recent['RSI'].values
+
+        price_new_low = close_vals[-1] <= close_vals.min()
+        rsi_not_new_low = rsi_vals[-1] > rsi_vals.min()
+        price_new_high = close_vals[-1] >= close_vals.max()
+        rsi_not_new_high = rsi_vals[-1] < rsi_vals.max()
+
+        divergence = False
+        if price_new_low and rsi_not_new_low:
+            divergence = True  # 正背離
+        elif price_new_high and rsi_not_new_high:
+            divergence = True  # 負背離
+
+        # 有背離則加強訊號 (+1 或 -1)
+        if divergence:
+            if last_signal > 0:
+                last_signal += 1
+            elif last_signal < 0:
+                last_signal -= 1
+
+        return last_signal
 
 
 async def THREE(t): #三根陰陽線*1
@@ -354,6 +380,7 @@ async def get_current_price(symbol):
 
 dc = "https://discord.com/api/webhooks/1387480183698886777/RAzRv4VECjgloChid-aL0vg24DnEqpAHw66ASMSLszpMJTNxm9djACseKE4x7kjydD63"
 
+
 symbols = [
     "BTC-USDT", "ETH-USDT", "DOT-USDT", "SOL-USDT", "XRP-USDT",
     "AAVE-USDT", "INJ-USDT", "CRV-USDT", "LINK-USDT", "OM-USDT",
@@ -365,6 +392,10 @@ symbols = [
 
 # 權重列表，對應指標順序：MA, BE_BIG, MACD, RSI, THREE, BREAK_OUT, KDJ
 weights = [3, 3, 2, 2, 1, 1, 1]
+
+skip_counts = {}  # 全域字典，記錄幣種跳過次數
+
+
 
 async def get_current_price(symbol):
     try:
@@ -428,6 +459,13 @@ async def send_to_discord(message: str):
                 print(f"發送失敗，狀態碼：{resp.status}，訊息：{text}")
 
 async def evaluate_symbol(symbol):
+
+    # 如果該幣跳過計數 > 0，直接跳過並扣減一次
+    if skip_counts.get(symbol, 0) > 0:
+        skip_counts[symbol] -= 1
+        print(f"跳過 {symbol} 偵測，剩餘跳過次數：{skip_counts[symbol]}")
+        return  # 不做評估
+    indicators = ['MA', 'BE_BIG', 'MACD', 'RSI', 'THREE', 'BREAK_OUT', 'KDJ']
     scores = [
         await MA(symbol),
         await BE_BIG(symbol),
@@ -444,6 +482,10 @@ async def evaluate_symbol(symbol):
     # 幣名簡化
     short = symbol.split("-")[0]
     emoji = emoji_map.get(short, "")
+    triggered_indicators = [name for name, score in zip(indicators, scores) if score != 0]
+
+    # 轉成字串（用逗號分隔）
+    indicators_str = ", ".join(triggered_indicators) if triggered_indicators else "無"
 
     # 判斷進場方向
     if total_score >= 5:
@@ -452,7 +494,8 @@ async def evaluate_symbol(symbol):
         direction = "📉 **看跌進場**"
     else:
         return 0
-
+    skip_counts[symbol] = 2
+    
     # 處理ATR顯示
     atr_info = f"📏 ATR: {atr:,.3f}  " \
                f"1.5: {atr*1.5:,.3f}  " \
@@ -464,7 +507,8 @@ async def evaluate_symbol(symbol):
         f"💰 現價：${current_price:,.2f}\n"
         f"📊 總分：{total_score}\n"
         f"{atr_info}"
-        f"{direction}"
+        f"{direction}\n"
+        f"📌 進場依據：{indicators_str}"
     )
 
     await send_to_discord(message)
