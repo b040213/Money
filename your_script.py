@@ -550,7 +550,7 @@ async def evaluate_symbol_15m(symbol):
     elif total_score <= -5:
         direction = "📉 **看跌進場**"
     else:
-        return 0
+        direction = "測試"
     skip_counts_15m[symbol] = 2
     
     # 處理ATR顯示
