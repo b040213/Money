@@ -558,7 +558,7 @@ async def evaluate_symbol_15m(symbol):
     elif total_score <= -8:
         direction = "📈 **強力進空**"
     else:
-        retuen 0
+        return 0
     skip_counts_15m[symbol] = 2
     
     # 處理ATR顯示
