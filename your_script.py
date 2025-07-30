@@ -490,8 +490,12 @@ async def evaluate_symbol_1h(symbol):
     # 判斷進場方向
     if total_score >= 5:
         direction = "📈 **看漲進場**"
+    elif total_score >= 8:
+        direction = "📉 **強力進多**"
     elif total_score <= -5:
         direction = "📉 **看跌進場**"
+    elif total_score <= -8:
+        direction = "📈 **強力進空**"
     else:
         return 0
     skip_counts_1h[symbol] = 2
@@ -547,10 +551,14 @@ async def evaluate_symbol_15m(symbol):
     # 判斷進場方向
     if total_score >= 5:
         direction = "📈 **看漲進場**"
+    elif total_score >= 8:
+        direction = "📉 **強力進多**"
     elif total_score <= -5:
         direction = "📉 **看跌進場**"
+    elif total_score <= -8:
+        direction = "📈 **強力進空**"
     else:
-        direction = "測試"
+        retuen 0
     skip_counts_15m[symbol] = 2
     
     # 處理ATR顯示
