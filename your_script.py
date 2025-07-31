@@ -498,7 +498,7 @@ async def evaluate_symbol_1h(symbol):
         direction = "📈 **強力進空**"
     else:
         return 0
-    skip_counts_1h[symbol] = 2
+    skip_counts_1h[symbol] = 4
     
     # 處理ATR顯示
     atr_info = f"📏 ATR: {atr:,.3f}  " \
@@ -559,7 +559,7 @@ async def evaluate_symbol_15m(symbol):
         direction = "📈 **強力進空**"
     else:
         return 0
-    skip_counts_15m[symbol] = 2
+    skip_counts_15m[symbol] = 4
     
     # 處理ATR顯示
     atr_info = f"📏 ATR: {atr:,.3f}  " \
@@ -587,7 +587,7 @@ async def run_loop_1h():
             await evaluate_symbol_1h(sym)
             await asyncio.sleep(0.2)  # 每次發完訊息後等待0.2秒，避免限速
         print("等待 20 分鐘後重新判斷...\n")
-        await asyncio.sleep(1200)  # 非同步等待20分鐘
+        await asyncio.sleep(720)  # 非同步等待20分鐘
 
 async def run_loop_15m():
     while True:
@@ -596,7 +596,7 @@ async def run_loop_15m():
             await asyncio.sleep(0.2)  # 每次發完訊息後等待0.2秒，避免限速
             
         print("等待 5 分鐘後重新判斷...\n")
-        await asyncio.sleep(300)  # 非同步等待5分鐘
+        await asyncio.sleep(180)  # 非同步等待5分鐘
         
 async def run_loop_forever():
     await asyncio.gather(
