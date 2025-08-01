@@ -9,7 +9,8 @@ import aiohttp
 api_key = "L9ywGJGME1uqTkIRd1Od08IvXyWCCyA2YKGwMPnde8BWOmm8gAC5xCdGAZdXFWZMt1euiT574cgAvQdQTw"
 api_secret = "NYY1OfADXhu26a6F4Tw67RbHDvJcQ2bGOcQWOI1vXccWRoutdIdfsvxyxVtdLxZAGFYn9eYZN6RX7w2fQ"
 
-async def MA(symbol,interval): #ma平均移動線*3
+
+async def MA(symbol, interval):  # ma平均移動線*3，交叉+排列加分版
     async with BingXAsyncClient(api_key=api_key, api_secret=api_secret) as client:
         res = await client.swap.kline_candlestick_data(
             symbol=symbol,
@@ -26,12 +27,12 @@ async def MA(symbol,interval): #ma平均移動線*3
 
         df['MA5'] = df['close'].rolling(window=5).mean()
         df['MA10'] = df['close'].rolling(window=10).mean()
+        df['MA20'] = df['close'].rolling(window=20).mean()
 
-        df.dropna(subset=['MA5', 'MA10'], inplace=True)
+        df.dropna(subset=['MA5', 'MA10', 'MA20'], inplace=True)
         if len(df) < 3:
-            return 0  # 需要至少3筆資料以便比對最後兩根
+            return 0  # 資料不足
 
-        # 取最後三根K線（為了能計算兩次交叉判斷）
         prev2 = df.iloc[-3]
         prev1 = df.iloc[-2]
         last  = df.iloc[-1]
@@ -51,26 +52,34 @@ async def MA(symbol,interval): #ma平均移動線*3
         elif prev1['MA5'] >= prev1['MA10'] and last['MA5'] < last['MA10']:
             signal2 = -1
 
-        # 回傳邏輯
-        if signal1 == signal2:
-            return signal1
+        # 綜合兩根訊號（你原本的邏輯）
+        if signal1 == signal2 and signal1 != 0:
+            signal = signal1
         elif signal1 != 0 and signal2 == 0:
-            return signal1
+            signal = signal1
         elif signal2 != 0 and signal1 == 0:
-            return signal2
+            signal = signal2
         else:
-            return 0
+            signal = 0
+
+        # 加入排列加成邏輯（在最後一根判斷）
+        if signal == 1 and last['MA5'] > last['MA10'] > last['MA20']:
+            signal += 0.5
+        elif signal == -1 and last['MA5'] < last['MA10'] < last['MA20']:
+            signal -= 0.5
+
+        return signal
 
 
 
-async def BE_BIG(symbol,interval): #成交量放大*3
+async def BE_BIG(symbol, interval):
     async with BingXAsyncClient(api_key=api_key, api_secret=api_secret) as client:
         res = await client.swap.kline_candlestick_data(
             symbol=symbol,
             interval=interval,
             limit=30
         )
-
+        
         data = [kline.__dict__ for kline in res.data]
         df = pd.DataFrame(data)
         df = df.sort_values('time')
@@ -81,34 +90,42 @@ async def BE_BIG(symbol,interval): #成交量放大*3
             df[col] = df[col].astype(float)
 
         df['vol_mean20'] = df['volume'].rolling(window=20).mean()
-        df['vol_spike'] = df['volume'] > 2 * df['vol_mean20']
+        df['vol_ratio'] = df['volume'] / df['vol_mean20']
         df['price_up'] = df['close'] > df['close'].shift(1)
         df['price_down'] = df['close'] < df['close'].shift(1)
 
-        df['signal'] = 0
-        df.loc[df['vol_spike'] & df['price_up'], 'signal'] = 1
-        df.loc[df['vol_spike'] & df['price_down'], 'signal'] = -1
+        conditions = [
+            (df['vol_ratio'] >= 3) & df['price_up'],
+            (df['vol_ratio'] >= 2.5) & df['price_up'],
+            (df['vol_ratio'] >= 2) & df['price_up'],
+            (df['vol_ratio'] >= 1.5) & df['price_up'],
+            (df['vol_ratio'] >= 3) & df['price_down'],
+            (df['vol_ratio'] >= 2.5) & df['price_down'],
+            (df['vol_ratio'] >= 2) & df['price_down'],
+            (df['vol_ratio'] >= 1.5) & df['price_down']
+        ]
+
+        choices = [2, 1.5, 1, 0.5, -2, -1.5, -1, -0.5]
+
+        df['signal'] = np.select(conditions, choices, default=0)
 
         # 取最後兩根K棒的訊號
         last_two = df['signal'].iloc[-2:]
-
-        # 檢查最後兩根K棒是否有訊號
-        last_two = df['signal'].iloc[-2:]
         signals = set(last_two.values)
 
-        if signals == {1}:
-            return 1
-        elif signals == {-1}:
-            return -1
-        elif signals == {1, -1}:
-            return 0  # 衝突訊號，回傳無訊號
+        if signals == {2} or signals == {1.5} or signals == {1} or signals == {0.5}:
+            # 如果都是正信號，回傳最大正訊號
+            return max(signals)
+        elif signals == {-2} or signals == {-1.5} or signals == {-1} or signals == {-0.5}:
+            # 如果都是負信號，回傳最大負訊號（絕對值最大，但要回負）
+            return min(signals)
         else:
+            # 混合或無訊號回傳0
             return 0
         
         
         
-        
-async def MACD(symbol,interval): #MACD判斷*2
+async def MACD(symbol, interval):  # MACD 判斷強度版，±0 → ±2
     async with BingXAsyncClient(api_key=api_key, api_secret=api_secret) as client:
         res = await client.swap.kline_candlestick_data(
             symbol=symbol,
@@ -132,29 +149,50 @@ async def MACD(symbol,interval): #MACD判斷*2
         df['DEA'] = df['DIF'].ewm(span=9, adjust=False).mean()
         df['MACD_hist'] = df['DIF'] - df['DEA']
 
-        # 建立訊號欄位：1=買進，-1=賣出，0=無
-        df['signal'] = 0
+        df['signal'] = 0.0
 
-        # MACD 死亡交叉條件：DIF 從上往下穿越 DEA，且 MACD_hist 由正轉負
-        cond_sell = (df['DIF'] < df['DEA']) & (df['DIF'].shift(1) >= df['DEA'].shift(1)) & (df['MACD_hist'] < 0) & (df['MACD_hist'].shift(1) >= 0)
-        # MACD 黃金交叉條件：DIF 從下往上穿越 DEA，且 MACD_hist 由負轉正
-        cond_buy = (df['DIF'] > df['DEA']) & (df['DIF'].shift(1) <= df['DEA'].shift(1)) & (df['MACD_hist'] > 0) & (df['MACD_hist'].shift(1) <= 0)
+        # 判斷交叉（黃金 / 死亡）條件
+        cond_sell = (
+            (df['DIF'] < df['DEA']) &
+            (df['DIF'].shift(1) >= df['DEA'].shift(1)) &
+            (df['MACD_hist'] < 0) & (df['MACD_hist'].shift(1) >= 0)
+        )
+        cond_buy = (
+            (df['DIF'] > df['DEA']) &
+            (df['DIF'].shift(1) <= df['DEA'].shift(1)) &
+            (df['MACD_hist'] > 0) & (df['MACD_hist'].shift(1) <= 0)
+        )
 
         df.loc[cond_buy, 'signal'] = 1
         df.loc[cond_sell, 'signal'] = -1
 
-        # 取最後兩根訊號
-        last_two = df['signal'].iloc[-2:]
-        signals = set(last_two.values)
+        last2 = df.iloc[-2]
+        last1 = df.iloc[-1]
 
-        if signals == {1}:
-            return 1
-        elif signals == {-1}:
-            return -1
-        elif signals == {1, -1}:
-            return 0  # 衝突訊號
-        else:
-            return 0
+        signal = 0
+
+        # 最新兩根是否有交叉訊號
+        if last2['signal'] == 1 or last1['signal'] == 1:
+            signal = 1
+        elif last2['signal'] == -1 or last1['signal'] == -1:
+            signal = -1
+
+        # 如果剛交叉，檢查 DIF-DEA 是否擴大、柱狀體是否放大
+        if signal != 0:
+            dif_gap_prev = abs(last2['DIF'] - last2['DEA'])
+            dif_gap_now = abs(last1['DIF'] - last1['DEA'])
+            hist_prev = abs(last2['MACD_hist'])
+            hist_now = abs(last1['MACD_hist'])
+
+            # 動能擴大
+            if dif_gap_now > dif_gap_prev:
+                signal += 0.5 if signal > 0 else -0.5
+
+            # 柱體放大
+            if hist_now > hist_prev:
+                signal += 0.5 if signal > 0 else -0.5
+
+        return signal
 
 
 
@@ -187,11 +225,11 @@ async def RSI(symbol,interval): #RSI*2
         rs = avg_gain / avg_loss
         df['RSI'] = 100 - (100 / (1 + rs))
 
-        df['signal'] = 0
+        df['signal'] = 0.0
 
         # 優先判斷穿越 20/80
-        df.loc[(df['RSI'] > 20) & (df['RSI'].shift(1) <= 20), 'signal'] = 2
-        df.loc[(df['RSI'] < 80) & (df['RSI'].shift(1) >= 80), 'signal'] = -2
+        df.loc[(df['RSI'] > 20) & (df['RSI'].shift(1) <= 20), 'signal'] = 1.5
+        df.loc[(df['RSI'] < 80) & (df['RSI'].shift(1) >= 80), 'signal'] = -1.5
 
         # 再判斷穿越 30/70，且未被 20/80 訊號覆蓋才設定
         df.loc[((df['RSI'] > 30) & (df['RSI'].shift(1) <= 30)) & (df['signal'] == 0), 'signal'] = 1
@@ -227,9 +265,9 @@ async def RSI(symbol,interval): #RSI*2
         # 有背離則加強訊號 (+1 或 -1)
         if divergence:
             if last_signal > 0:
-                last_signal += 1
+                last_signal += 0.5
             elif last_signal < 0:
-                last_signal -= 1
+                last_signal -= 0.5
 
         return last_signal
 
@@ -279,17 +317,18 @@ async def THREE(symbol,interval): #三根陰陽線*1
 
 
 
-async def BREAK_OUT(symbol,interval): #價格突破阻力*1
-    async with BingXAsyncClient(api_key=api_key, api_secret=api_secret) as client:
-        res = await client.swap.kline_candlestick_data(
-            symbol=symbol,
-            interval=interval,
-            limit=30  # 取30根足夠做10~20根區間判斷
-        )
-
+async def BREAK_OUT(symbol, interval):
+    try:
+        async with BingXAsyncClient(api_key=api_key, api_secret=api_secret) as client:
+            res = await client.swap.kline_candlestick_data(
+                symbol=symbol,
+                interval=interval,
+                limit=30
+            )
+        
+        # 整理 K 線資料
         data = [kline.__dict__ for kline in res.data]
-        df = pd.DataFrame(data)
-        df = df.sort_values('time')
+        df = pd.DataFrame(data).sort_values('time')
         df['time'] = pd.to_datetime(df['time'], unit='ms')
         df['time'] = df['time'].dt.tz_localize('UTC').dt.tz_convert('Asia/Taipei')
         df.set_index('time', inplace=True)
@@ -297,29 +336,48 @@ async def BREAK_OUT(symbol,interval): #價格突破阻力*1
         for col in ['open', 'high', 'low', 'close', 'volume']:
             df[col] = df[col].astype(float)
 
-        # 計算過去10到20根的最高價與最低價(不含當前根)
-        df['max_10_20'] = df['high'].shift(1).rolling(window=11).max()  # 取前11根中最高，包含第10根
-        df['min_10_20'] = df['low'].shift(1).rolling(window=11).min()
+        # 計算過去 20 根（不含當前）高低點
+        df['max_20'] = df['high'].shift(1).rolling(window=20).max()
+        df['min_20'] = df['low'].shift(1).rolling(window=20).min()
 
-        # 建立訊號欄位，判斷是否突破前10-20根最高/最低價
-        df['signal'] = 0
-        df.loc[df['close'] > df['max_10_20'], 'signal'] = 1    # 突破最高價 → 看漲
-        df.loc[df['close'] < df['min_10_20'], 'signal'] = -1   # 跌破最低價 → 看跌
+        last_close = df['close'].iloc[-1]
+        resistance = df['max_20'].iloc[-1]
+        support = df['min_20'].iloc[-1]
 
-        # 取最後兩根訊號
-        last_two = df['signal'].iloc[-2:]
-        signals = set(last_two.values)
+        # 取得 ATR 值
+        atr_value = await ATR(symbol, 14)
+        if atr_value is None:
+            return 0  # 計算ATR失敗則跳過
 
-        if signals == {1}:
-            return 1
-        elif signals == {-1}:
-            return -1
-        elif signals == {1, -1}:
-            return 0  # 衝突訊號
-        else:
-            return 0
-        
-def calculate_kdj(df, n=9, k_period=3, d_period=3): #KDJ*1
+        signal = 0
+
+        # 上漲突破判斷
+        if last_close > resistance:
+            breakout_amt = last_close - resistance
+            if breakout_amt >= 1.5 * atr_value:
+                signal = 2
+            elif breakout_amt >= 1.0 * atr_value:
+                signal = 1.5
+            elif breakout_amt > 0 :
+                signal = 1
+
+        # 下跌跌破判斷
+        elif last_close < support:
+            breakdown_amt = support - last_close
+            if breakdown_amt >= 1.5 * atr_value:
+                signal = -2
+            elif breakdown_amt >= 1.0 * atr_value:
+                signal = -1.5
+            elif breakdown_amt >0 :
+                signal = -1
+
+        return signal
+
+    except Exception as e:
+        print(f"❗ 計算 {symbol} 突破訊號時發生錯誤：{e}")
+        return 0
+    
+def calculate_kdj(df, n=9, k_period=3, d_period=3):
     low_min = df['low'].rolling(window=n).min()
     high_max = df['high'].rolling(window=n).max()
     rsv = (df['close'] - low_min) / (high_max - low_min) * 100
@@ -328,7 +386,8 @@ def calculate_kdj(df, n=9, k_period=3, d_period=3): #KDJ*1
     df['J'] = 3 * df['K'] - 2 * df['D']
     return df
 
-async def KDJ(symbol,interval): #KDJ*1
+
+async def KDJ(symbol, interval):
     async with BingXAsyncClient(api_key=api_key, api_secret=api_secret) as client:
         res = await client.swap.kline_candlestick_data(
             symbol=symbol,
@@ -348,25 +407,194 @@ async def KDJ(symbol,interval): #KDJ*1
 
         df = calculate_kdj(df)
 
-        # 建立訊號欄位：1=買進，-1=賣出，0=無
-        df['signal'] = 0
-        df.loc[(df['K'] > df['D']) & (df['K'].shift(1) <= df['D'].shift(1)), 'signal'] = 1
-        df.loc[(df['K'] < df['D']) & (df['K'].shift(1) >= df['D'].shift(1)), 'signal'] = -1
+        signal1 = 0
+        signal2 = 0
 
-        # 檢查最後兩根K棒是否有訊號
-        last_two = df['signal'].iloc[-2:]
-        signals = set(last_two.values)
+        # 交叉訊號判斷，倒數第二根
+        if (df['K'].iloc[-3] <= df['D'].iloc[-3]) and (df['K'].iloc[-2] > df['D'].iloc[-2]):
+            signal1 = 1
+        elif (df['K'].iloc[-3] >= df['D'].iloc[-3]) and (df['K'].iloc[-2] < df['D'].iloc[-2]):
+            signal1 = -1
 
-        if signals == {1}:
-            return 1
-        elif signals == {-1}:
-            return -1
-        elif signals == {1, -1}:
-            return 0  # 衝突訊號，回傳無訊號
+        # 交叉訊號判斷，倒數第一根
+        if (df['K'].iloc[-2] <= df['D'].iloc[-2]) and (df['K'].iloc[-1] > df['D'].iloc[-1]):
+            signal2 = 1
+        elif (df['K'].iloc[-2] >= df['D'].iloc[-2]) and (df['K'].iloc[-1] < df['D'].iloc[-1]):
+            signal2 = -1
+
+        # 綜合交叉訊號
+        if signal1 == signal2 and signal1 != 0:
+            signal = signal1
+        elif signal1 != 0 and signal2 == 0:
+            signal = signal1
+        elif signal2 != 0 and signal1 == 0:
+            signal = signal2
         else:
-            return 0
+            signal = 0
+
+        # 強度加成判斷（只在非零訊號時加強）
+        if signal != 0:
+            last_K = df['K'].iloc[-1]
+            last_D = df['D'].iloc[-1]
+            last_J = df['J'].iloc[-1]
+
+            # 超賣區且 J 明顯高於 K、D（強多）
+            if signal > 0 and last_K < 20 and last_D < 20 and last_J > last_K and last_J > last_D:
+                signal += 0.5
+
+            # 超買區且 J 明顯低於 K、D（強空）
+            if signal < 0 and last_K > 80 and last_D > 80 and last_J < last_K and last_J < last_D:
+                signal -= 0.5
+
+            # 連續兩根訊號（signal1 與 signal2 都相同且非零）再加強 0.5
+            if signal1 == signal2 and signal1 != 0:
+                signal += 0.5 if signal > 0 else -0.5
+
+        return signal
 
 
+
+
+async def BOLL(symbol, interval, period=20, std_mult=2):
+    async with BingXAsyncClient(api_key=api_key, api_secret=api_secret) as client:
+        res = await client.swap.kline_candlestick_data(
+            symbol=symbol,
+            interval=interval,
+            limit=period + 50
+        )
+    data = [kline.__dict__ for kline in res.data]
+    df = pd.DataFrame(data)
+    df = df.sort_values('time')
+    df['time'] = pd.to_datetime(df['time'], unit='ms')
+    df.set_index('time', inplace=True)
+
+    for col in ['open', 'high', 'low', 'close']:
+        df[col] = df[col].astype(float)
+
+    # 計算中軸與上下軌
+    df['MA20'] = df['close'].rolling(window=period).mean()
+    df['STD'] = df['close'].rolling(window=period).std()
+    df['Upper'] = df['MA20'] + std_mult * df['STD']
+    df['Lower'] = df['MA20'] - std_mult * df['STD']
+
+    # 布林帶寬度
+    df['Width'] = df['Upper'] - df['Lower']
+    width_mean = df['Width'].rolling(window=period).mean()
+
+    # 訊號欄位
+    df['signal'] = 0.0
+
+    # 取最後兩根K線判斷
+    last_two = df.iloc[-2:]
+
+    # 判斷價格突破上下軌（貼近也算）
+    for idx, row in last_two.iterrows():
+        sig = 0
+        if row['close'] >= row['Upper']:
+            sig += 1
+        elif row['close'] <= row['Lower']:
+            sig -= 1
+
+        # 判斷寬度收縮：當前寬度 < 過去平均寬度的70%
+        if row['Width'] < 0.7 * width_mean.loc[idx]:
+            if sig > 0:
+                sig += 0.5  # 多頭收縮強化
+            elif sig < 0:
+                sig -= 0.5  # 空頭收縮強化
+            else:
+                # 如果沒突破，但寬度收縮仍判定弱訊號
+                # 根據你說的，只要寬度收縮也要回傳信號，
+                # 我這邊用 ±0.5 作區分
+                # 多頭趨勢不明，先不回正訊號，這邊可調整
+                pass
+
+        df.at[idx, 'signal'] = sig
+
+    # 最後取倒數兩根信號總和，限幅 ±1.5
+    total_signal = df['signal'].iloc[-2:].sum()
+    if total_signal > 1.5:
+        total_signal = 1.5
+    elif total_signal < -1.5:
+        total_signal = -1.5
+
+    # 取整數或半分數，方便後續整合
+    if abs(total_signal) == 1.5:
+        return 1.5 if total_signal > 0 else -1.5
+    elif abs(total_signal) >= 1.0:
+        return 1.0 if total_signal > 0 else -1.0
+    elif abs(total_signal) >= 0.5:
+        return 0.5 if total_signal > 0 else -0.5
+    else:
+        return 0
+
+
+async def ADX(symbol, interval, period=14):
+    try:
+        async with BingXAsyncClient(api_key=api_key, api_secret=api_secret) as client:
+            res = await client.swap.kline_candlestick_data(
+                symbol=symbol,
+                interval=interval,
+                limit=period + 20
+            )
+
+        data = [k.__dict__ for k in res.data]
+        df = pd.DataFrame(data)
+        df = df.sort_values('time')
+        df['time'] = pd.to_datetime(df['time'], unit='ms')
+        df.set_index('time', inplace=True)
+
+        for col in ['open', 'high', 'low', 'close']:
+            df[col] = df[col].astype(float)
+
+        # True Range 計算
+        df['H-L'] = df['high'] - df['low']
+        df['H-PC'] = abs(df['high'] - df['close'].shift(1))
+        df['L-PC'] = abs(df['low'] - df['close'].shift(1))
+        df['TR'] = df[['H-L', 'H-PC', 'L-PC']].max(axis=1)
+
+        # +DM / -DM 計算
+        df['+DM'] = np.where((df['high'] - df['high'].shift(1)) > (df['low'].shift(1) - df['low']),
+                             np.maximum(df['high'] - df['high'].shift(1), 0), 0)
+        df['-DM'] = np.where((df['low'].shift(1) - df['low']) > (df['high'] - df['high'].shift(1)),
+                             np.maximum(df['low'].shift(1) - df['low'], 0), 0)
+
+        # Wilder smoothing（指數平滑移動平均）
+        tr14 = df['TR'].ewm(span=period, adjust=False).mean()
+        plus_dm14 = df['+DM'].ewm(span=period, adjust=False).mean()
+        minus_dm14 = df['-DM'].ewm(span=period, adjust=False).mean()
+
+        # DI與DX
+        plus_di14 = 100 * (plus_dm14 / tr14)
+        minus_di14 = 100 * (minus_dm14 / tr14)
+        dx = 100 * abs(plus_di14 - minus_di14) / (plus_di14 + minus_di14).replace(0, np.nan)
+
+        # ADX = DX 的 EMA
+        adx = dx.ewm(span=period, adjust=False).mean()
+
+        last_adx = adx.iloc[-1]
+
+        
+        if interval == "1h":
+            if last_adx < 25:
+                return 0
+            elif last_adx > 90:
+                return 1.8
+            else:
+                return round(0.8 + (last_adx - 25) / 65, 2)
+
+        elif interval == "15m":
+            if last_adx < 20:
+                return 0
+            elif last_adx > 60:
+                return 1.8
+            else:
+                return round(0.8 + (last_adx - 20) * (1.8 - 0.8) / (60 - 20), 2)
+
+        else:
+            return 1.00
+    except Exception as e:
+        print(f"❗ 計算 {symbol} ADX 時發生錯誤：{e}")
+        return 1.00  # 安全預設值
 
 async def get_current_price(symbol):
     try:
@@ -390,8 +618,8 @@ symbols = [
     "GALA-USDT","IMX-USDT","JASMY-USDT","ORDI-USDT","TIA-USDT"
     ]
 
-# 權重列表，對應指標順序：MA, BE_BIG, MACD, RSI, THREE, BREAK_OUT, KDJ
-weights = [3, 3, 1.5, 2, 1, 1, 1]
+# 權重列表，對應指標順序：MA, BE_BIG, MACD, RSI, THREE, BREAK_OUT, KDJ, BOLL
+weights = [3, 3, 2, 2, 1, 1.5, 1,2]
 
 skip_counts_1h = {}  # 全域字典，記錄幣種跳過次數
 skip_counts_15m = {}
@@ -465,7 +693,7 @@ async def evaluate_symbol_1h(symbol):
         skip_counts_1h[symbol] -= 1
         print(f"跳過 {symbol} 偵測，剩餘跳過次數：{skip_counts_1h[symbol]}")
         return  # 不做評估
-    indicators = ['MA', 'BE_BIG', 'MACD', 'RSI', 'THREE', 'BREAK_OUT', 'KDJ']
+    indicators = ['MA', 'BE_BIG', 'MACD', 'RSI', 'THREE', 'BREAK_OUT', 'KDJ','BOLL']
     scores = [
         await MA(symbol,interval="1h"),
         await BE_BIG(symbol,interval="1h"),
@@ -473,9 +701,13 @@ async def evaluate_symbol_1h(symbol):
         await RSI(symbol,interval="1h"),
         await THREE(symbol,interval="1h"),
         await BREAK_OUT(symbol,interval="1h"),
-        await KDJ(symbol,interval="1h")
+        await KDJ(symbol,interval="1h"),
+        await BOLL(symbol,interval="1h")
+        
     ]
     total_score = sum(s * w for s, w in zip(scores, weights))
+    adx = await ADX(symbol,interval="1h")
+    total_score = total_score*adx
     current_price = await get_current_price(symbol)
     atr = await ATR(symbol)
 
@@ -488,13 +720,13 @@ async def evaluate_symbol_1h(symbol):
     indicators_str = ", ".join(triggered_indicators) if triggered_indicators else "無"
 
     # 判斷進場方向
-    if total_score >= 5:
+    if total_score >= 10:
         direction = "📈 **看漲進場**"
-    elif total_score >= 8:
+    elif total_score >= 15:
         direction = "📉 **強力進多**"
-    elif total_score <= -5:
+    elif total_score <= -10:
         direction = "📉 **看跌進場**"
-    elif total_score <= -8:
+    elif total_score <= -15:
         direction = "📈 **強力進空**"
     else:
         return 0
@@ -526,7 +758,7 @@ async def evaluate_symbol_15m(symbol):
         skip_counts_15m[symbol] -= 1
         print(f"跳過 {symbol} 偵測，剩餘跳過次數：{skip_counts_15m[symbol]}")
         return  # 不做評估
-    indicators = ['MA', 'BE_BIG', 'MACD', 'RSI', 'THREE', 'BREAK_OUT', 'KDJ']
+    indicators = ['MA', 'BE_BIG', 'MACD', 'RSI', 'THREE', 'BREAK_OUT', 'KDJ','BOLL']
     scores = [
         await MA(symbol,interval="15m"),
         await BE_BIG(symbol,interval="15m"),
@@ -534,9 +766,12 @@ async def evaluate_symbol_15m(symbol):
         await RSI(symbol,interval="15m"),
         await THREE(symbol,interval="15m"),
         await BREAK_OUT(symbol,interval="15m"),
-        await KDJ(symbol,interval="15m")
-    ]
+        await KDJ(symbol,interval="15m"),
+        await BOLL(symbol,interval="15m")
+        ]
     total_score = sum(s * w for s, w in zip(scores, weights))
+    adx = await ADX(symbol,interval="15m")
+    total_score = total_score*adx
     current_price = await get_current_price(symbol)
     atr = await ATR(symbol)
 
@@ -549,13 +784,13 @@ async def evaluate_symbol_15m(symbol):
     indicators_str = ", ".join(triggered_indicators) if triggered_indicators else "無"
 
     # 判斷進場方向
-    if total_score >= 5:
+    if total_score >= 10:
         direction = "📈 **看漲進場**"
-    elif total_score >= 8:
+    elif total_score >= 15:
         direction = "📉 **強力進多**"
-    elif total_score <= -5:
+    elif total_score <= -10:
         direction = "📉 **看跌進場**"
-    elif total_score <= -8:
+    elif total_score <= -15:
         direction = "📈 **強力進空**"
     else:
         return 0
@@ -585,17 +820,17 @@ async def run_loop_1h():
     while True:
         for sym in symbols:
             await evaluate_symbol_1h(sym)
-            await asyncio.sleep(0.2)  # 每次發完訊息後等待0.2秒，避免限速
-        print("等待 20 分鐘後重新判斷...\n")
+            await asyncio.sleep(0.5)  # 每次發完訊息後等待0.2秒，避免限速
+        print("等待 12 分鐘後重新判斷...\n")
         await asyncio.sleep(720)  # 非同步等待20分鐘
 
 async def run_loop_15m():
     while True:
         for sym in symbols:
             await evaluate_symbol_15m(sym)
-            await asyncio.sleep(0.2)  # 每次發完訊息後等待0.2秒，避免限速
+            await asyncio.sleep(0.5)  # 每次發完訊息後等待0.2秒，避免限速
             
-        print("等待 5 分鐘後重新判斷...\n")
+        print("等待 3 分鐘後重新判斷...\n")
         await asyncio.sleep(180)  # 非同步等待5分鐘
         
 async def run_loop_forever():
@@ -605,4 +840,5 @@ async def run_loop_forever():
     )        
 
 if __name__ == "__main__":
-    asyncio.run(run_loop_1h())
+    asyncio.run(run_loop_forever())
+    
