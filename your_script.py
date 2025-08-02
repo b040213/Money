@@ -702,8 +702,9 @@ symbols = [
     "AAVE-USDT", "INJ-USDT", "CRV-USDT", "LINK-USDT", "OM-USDT",
     "CHZ-USDT","THETA-USDT","NEAR-USDT","VET-USDT","AVAX-USDT",
     "FIL-USDT","ICP-USDT","BNB-USDT","ALGO-USDT","GRT-USDT",
-    "OP-USDT","HBAR-USDT","ARB-USDT","TONCOIN-USDT","APT-USDT",
-    "GALA-USDT","IMX-USDT","JASMY-USDT","ORDI-USDT","TIA-USDT"
+    "OP-USDT","HBAR-USDT","ARB-USDT","MANA-USDT","APT-USDT",
+    "GALA-USDT","LDO-USDT","SAND-USDT","ATOM-USDT","XLM-USDT",
+    "ADA-USDT"
     ]
 
 # 權重列表，對應指標順序：MA, BE_BIG, MACD, RSI, THREE, BREAK_OUT, KDJ, BOLL
@@ -760,8 +761,9 @@ emoji_map = {
     "AAVE": "•", "INJ": "•", "CRV": "•", "LINK": "•", "OM": "•",
     "CHZ": "•", "THETA": "•", "NEAR": "•", "VET": "•", "AVAX": "•",
     "FIL": "•", "ICP": "•", "BNB": "•", "ALGO": "•", "GRT": "•",
-    "OP": "•","HBAR": "•","ARB": "•","TONCOIN": "•","APT": "•",
-    "GALA": "•","IMX": "•","JASMY": "•","ORDI": "•","TIA": "•"
+    "OP": "•","HBAR": "•","ARB": "•","MANA": "•","APT": "•",
+    "GALA": "•","LDO": "•","SAND": "•","ATOM": "•","XLM": "•",
+    "ADA": "•"
 }
 
 async def send_to_discord(message: str):
