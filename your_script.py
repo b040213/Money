@@ -619,7 +619,7 @@ symbols = [
     ]
 
 # 權重列表，對應指標順序：MA, BE_BIG, MACD, RSI, THREE, BREAK_OUT, KDJ, BOLL
-weights = [3, 3, 2, 2, 1, 1.5, 1,2]
+weights = [3, 4.5, 2, 2, 1, 1.5, 1,2]
 
 skip_counts_1h = {}  # 全域字典，記錄幣種跳過次數
 skip_counts_15m = {}
@@ -720,13 +720,13 @@ async def evaluate_symbol_1h(symbol):
     indicators_str = ", ".join(triggered_indicators) if triggered_indicators else "無"
 
     # 判斷進場方向
-    if total_score >= 10:
+    if total_score >= 13:
         direction = "📈 **看漲進場**"
-    elif total_score >= 15:
+    elif total_score >= 18:
         direction = "📉 **強力進多**"
-    elif total_score <= -10:
+    elif total_score <= -13:
         direction = "📉 **看跌進場**"
-    elif total_score <= -15:
+    elif total_score <= -18:
         direction = "📈 **強力進空**"
     else:
         return 0
@@ -784,13 +784,13 @@ async def evaluate_symbol_15m(symbol):
     indicators_str = ", ".join(triggered_indicators) if triggered_indicators else "無"
 
     # 判斷進場方向
-    if total_score >= 10:
+    if total_score >= 13:
         direction = "📈 **看漲進場**"
-    elif total_score >= 15:
+    elif total_score >= 18:
         direction = "📉 **強力進多**"
-    elif total_score <= -10:
+    elif total_score <= -13:
         direction = "📉 **看跌進場**"
-    elif total_score <= -15:
+    elif total_score <= -18:
         direction = "📈 **強力進空**"
     else:
         return 0
