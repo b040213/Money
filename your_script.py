@@ -784,13 +784,13 @@ async def evaluate_symbol_15m(symbol):
     indicators_str = ", ".join(triggered_indicators) if triggered_indicators else "無"
 
     # 判斷進場方向
-    if total_score >= 13:
+    if total_score >= 12:
         direction = "📈 **看漲進場**"
-    elif total_score >= 18:
+    elif total_score >= 17:
         direction = "📉 **強力進多**"
-    elif total_score <= -13:
+    elif total_score <= -12:
         direction = "📉 **看跌進場**"
-    elif total_score <= -18:
+    elif total_score <= -17:
         direction = "📈 **強力進空**"
     else:
         return 0
