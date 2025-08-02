@@ -528,6 +528,94 @@ async def BOLL(symbol, interval, period=20, std_mult=2):
         return 0
 
 
+def calculate_trade_parameters(symbol: str, current_price: float, direction: str, intensity: str = "normal"):
+    """
+    計算進場點位、槓桿倍率、止損、止盈
+    direction: "bull" (看漲), "bear" (看跌)
+    intensity: "normal" (一般), "strong" (強力)
+    """
+
+    base_coin = symbol.split("-")[0].upper()
+
+    # 進場點位百分比（BTC用0.5%，其他1%）
+    entry_pct = 0.005 if base_coin == "BTC" else 0.01
+
+    # 進場點位計算
+    if direction == "bull":
+        entry_price = current_price * (1 - entry_pct)
+    elif direction == "bear":
+        entry_price = current_price * (1 + entry_pct)
+    else:
+        # 不明方向
+        return None
+
+    # 槓桿倍率設定
+    if intensity == "normal":
+        if base_coin == "BTC":
+            leverage = 10
+        elif base_coin in ("ETH", "BNB"):
+            leverage = 5
+        else:
+            leverage = 3
+    elif intensity == "strong":
+        if base_coin == "BTC":
+            leverage = 15
+        elif base_coin in ("ETH", "BNB"):
+            leverage = 8
+        else:
+            leverage = 5
+    else:
+        leverage = 3  # 預設
+
+    # 止損百分比（看漲看跌止損方向不同，且幣別不同）
+    if base_coin == "BTC":
+        stop_loss_pct = 0.02
+    elif base_coin in ("ETH", "BNB"):
+        stop_loss_pct = 0.03
+    else:
+        stop_loss_pct = 0.05
+
+    # 止損點位計算
+    if direction == "bull":
+        stop_loss_price = entry_price * (1 - stop_loss_pct)
+    else:  # bear
+        stop_loss_price = entry_price * (1 + stop_loss_pct)
+
+    # 止盈百分比及分批出場（40% 40% 20%）
+    if base_coin == "BTC":
+        tp1_pct, tp2_pct, tp3_pct = 0.02, 0.04, 0.08
+    elif base_coin in ("ETH", "BNB"):
+        tp1_pct, tp2_pct, tp3_pct = 0.03, 0.06, 0.12
+    else:
+        tp1_pct, tp2_pct, tp3_pct = 0.05, 0.10, 0.20
+
+    # 止盈點位計算（看漲看跌反向計算）
+    if direction == "bull":
+        tp1 = entry_price * (1 + tp1_pct)
+        tp2 = entry_price * (1 + tp2_pct)
+        tp3 = entry_price * (1 + tp3_pct)
+    else:
+        tp1 = entry_price * (1 - tp1_pct)
+        tp2 = entry_price * (1 - tp2_pct)
+        tp3 = entry_price * (1 - tp3_pct)
+
+    take_profit = [
+        (tp1, 0.4),
+        (tp2, 0.4),
+        (tp3, 0.2),
+    ]
+
+    return {
+        "entry_price": round(entry_price, 4),
+        "leverage": leverage,
+        "stop_loss": round(stop_loss_price, 4),
+        "take_profit": [(round(p, 4), ratio) for p, ratio in take_profit]
+    }
+
+
+
+
+
 async def ADX(symbol, interval, period=14):
     try:
         async with BingXAsyncClient(api_key=api_key, api_secret=api_secret) as client:
@@ -720,31 +808,60 @@ async def evaluate_symbol_1h(symbol):
     indicators_str = ", ".join(triggered_indicators) if triggered_indicators else "無"
 
     # 判斷進場方向
-    if total_score >= 13:
-        direction = "📈 **看漲進場**"
-    elif total_score >= 18:
-        direction = "📉 **強力進多**"
-    elif total_score <= -13:
-        direction = "📉 **看跌進場**"
+    if total_score >= 18:
+        direction_text = "🔥🔥 📉 **強力進多** 🔥🔥"
+        direction = "bull"
+        intensity = "strong"
+    elif total_score >= 12.5:
+        direction_text = "📈 **看漲進場**"
+        direction = "bull"
+        intensity = "normal"
     elif total_score <= -18:
-        direction = "📈 **強力進空**"
+        direction_text = "🔥🔥 📈 **強力進空** 🔥🔥"
+        direction = "bear"
+        intensity = "strong"
+    elif total_score <= -12.5:
+        direction_text = "📉 **看跌進場**"
+        direction = "bear"
+        intensity = "normal"
     else:
         return 0
     skip_counts_1h[symbol] = 4
     
     # 處理ATR顯示
-    atr_info = f"📏 ATR: {atr:,.3f}  " \
+    '''atr_info = f"📏 ATR: {atr:,.3f}  " \
                f"1.5: {atr*1.5:,.3f}  " \
-               f"3: {atr*3:,.3f}\n" if atr is not None else "📏 ATR: 無法計算\n"
+               f"3: {atr*3:,.3f}\n" if atr is not None else "📏 ATR: 無法計算\n"'''
+    trade_params = calculate_trade_parameters(symbol, current_price, direction, intensity)
+    if trade_params is None:
+        return 0
 
+    entry_price = trade_params["entry_price"]
+    leverage = trade_params["leverage"]
+    stop_loss = trade_params["stop_loss"]
+    take_profit = trade_params["take_profit"]
+
+    # 將進場點、槓桿、止損、止盈加入訊息
+    bingx_ratios = [40, 66, 100]  # 對應三段出場
+
+    tp_str = "\n".join([
+        f"止盈{int(ratio*100)}%：${price:.2f}   🔸拉 {bingx}%"
+        for (price, ratio), bingx in zip(take_profit, bingx_ratios)
+    ])
+    extra_info = (
+        f"🚀 進場點位: ${entry_price}\n"
+        f"🎯 槓桿倍率: {leverage}倍\n"
+        f"🛑 止損: ${stop_loss}\n"
+        f"{tp_str}\n"
+    )
     # 組合訊息
     message = (
         f"!!🚨注意🚨!! 🕐時區為1H🕐!!\n"
         f"{emoji} `{symbol}`\n"
         f"💰 現價：${current_price:,.2f}\n"
         f"📊 總分：{total_score}\n"
-        f"{atr_info}"
-        f"{direction}\n"
+        f"{direction_text}\n"
+        f"{extra_info}"
         f"📌 進場依據：{indicators_str}"
     )
 
@@ -784,14 +901,22 @@ async def evaluate_symbol_15m(symbol):
     indicators_str = ", ".join(triggered_indicators) if triggered_indicators else "無"
 
     # 判斷進場方向
-    if total_score >= 12:
-        direction = "📈 **看漲進場**"
-    elif total_score >= 17:
-        direction = "📉 **強力進多**"
-    elif total_score <= -12:
-        direction = "📉 **看跌進場**"
+    if total_score >= 17:
+        direction_text = "🔥🔥 📉 **強力進多** 🔥🔥"
+        direction = "bull"
+        intensity = "strong"
+    elif total_score >= 11.5:
+        direction_text =  "📈 **看漲進場**"
+        direction = "bull"
+        intensity = "normal"
     elif total_score <= -17:
-        direction = "📈 **強力進空**"
+        direction_text = "🔥🔥 📈 **強力進空** 🔥🔥"
+        direction = "bear"
+        intensity = "strong"
+    elif total_score <= -11.5:
+        direction_text = "📉 **看跌進場**"
+        direction = "bear"
+        intensity = "normal"
     else:
         return 0
     skip_counts_15m[symbol] = 4
@@ -800,15 +925,36 @@ async def evaluate_symbol_15m(symbol):
     atr_info = f"📏 ATR: {atr:,.3f}  " \
                f"1.5: {atr*1.5:,.3f}  " \
                f"3: {atr*3:,.3f}\n" if atr is not None else "📏 ATR: 無法計算\n"
+    trade_params = calculate_trade_parameters(symbol, current_price, direction, intensity)
+    if trade_params is None:
+        return 0
 
+    entry_price = trade_params["entry_price"]
+    leverage = trade_params["leverage"]
+    stop_loss = trade_params["stop_loss"]
+    take_profit = trade_params["take_profit"]
+
+    # 將進場點、槓桿、止損、止盈加入訊息
+    bingx_ratios = [40, 66, 100]  # 對應三段出場
+
+    tp_str = "\n".join([
+        f"止盈{int(ratio*100)}%：${price:.2f}   🔸拉 {bingx}%"
+        for (price, ratio), bingx in zip(take_profit, bingx_ratios)
+    ])
+    extra_info = (
+        f"🚀 進場點位: ${entry_price}\n"
+        f"🎯 槓桿倍率: {leverage}倍\n"
+        f"🛑 止損: ${stop_loss}\n"
+        f"{tp_str}\n"
+    )
     # 組合訊息
     message = (
         f"!!🚨注意🚨!!🕐時區為15m🕐!!\n"
         f"{emoji} `{symbol}`\n"
         f"💰 現價：${current_price:,.2f}\n"
         f"📊 總分：{total_score}\n"
-        f"{atr_info}"
-        f"{direction}\n"
+        f"{direction_text}\n"
+        f"{extra_info}"
         f"📌 進場依據：{indicators_str}"
     )
 
@@ -820,18 +966,18 @@ async def run_loop_1h():
     while True:
         for sym in symbols:
             await evaluate_symbol_1h(sym)
-            await asyncio.sleep(0.5)  # 每次發完訊息後等待0.2秒，避免限速
+            await asyncio.sleep(0.3)  # 每次發完訊息後等待0.2秒，避免限速
         print("等待 12 分鐘後重新判斷...\n")
-        await asyncio.sleep(720)  # 非同步等待20分鐘
+        await asyncio.sleep(720)  # 非同步等待12分鐘
 
 async def run_loop_15m():
     while True:
         for sym in symbols:
             await evaluate_symbol_15m(sym)
-            await asyncio.sleep(0.5)  # 每次發完訊息後等待0.2秒，避免限速
+            await asyncio.sleep(0.3)  # 每次發完訊息後等待0.2秒，避免限速
             
         print("等待 3 分鐘後重新判斷...\n")
-        await asyncio.sleep(180)  # 非同步等待5分鐘
+        await asyncio.sleep(180)  # 非同步等待3分鐘
         
 async def run_loop_forever():
     await asyncio.gather(
@@ -842,3 +988,5 @@ async def run_loop_forever():
 if __name__ == "__main__":
     asyncio.run(run_loop_forever())
     
+
+
