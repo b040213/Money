@@ -528,7 +528,7 @@ async def BOLL(symbol, interval, period=20, std_mult=2):
         return 0
 
 
-def calculate_trade_parameters(symbol: str, current_price: float, direction: str, intensity: str = "normal"):
+def calculate_trade_parameters_1h(symbol: str, current_price: float, direction: str, intensity: str = "normal"):
     """
     計算進場點位、槓桿倍率、止損、止盈
     direction: "bull" (看漲), "bear" (看跌)
@@ -613,6 +613,89 @@ def calculate_trade_parameters(symbol: str, current_price: float, direction: str
     }
 
 
+def calculate_trade_parameters_15m(symbol: str, current_price: float, direction: str, intensity: str = "normal"):
+    """
+    計算進場點位、槓桿倍率、止損、止盈
+    direction: "bull" (看漲), "bear" (看跌)
+    intensity: "normal" (一般), "strong" (強力)
+    """
+
+    base_coin = symbol.split("-")[0].upper()
+
+    # 進場點位百分比（BTC用0.5%，其他1%）
+    entry_pct = 0.005 if base_coin == "BTC" else 0.01
+
+    # 進場點位計算
+    if direction == "bull":
+        entry_price = current_price * (1 - entry_pct)
+    elif direction == "bear":
+        entry_price = current_price * (1 + entry_pct)
+    else:
+        # 不明方向
+        return None
+
+    # 槓桿倍率設定
+    if intensity == "normal":
+        if base_coin == "BTC":
+            leverage = 10
+        elif base_coin in ("ETH", "BNB"):
+            leverage = 5
+        else:
+            leverage = 3
+    elif intensity == "strong":
+        if base_coin == "BTC":
+            leverage = 15
+        elif base_coin in ("ETH", "BNB"):
+            leverage = 8
+        else:
+            leverage = 5
+    else:
+        leverage = 3  # 預設
+
+    # 止損百分比（看漲看跌止損方向不同，且幣別不同）
+    if base_coin == "BTC":
+        stop_loss_pct = 0.018
+    elif base_coin in ("ETH", "BNB"):
+        stop_loss_pct = 0.027
+    else:
+        stop_loss_pct = 0.045
+
+    # 止損點位計算
+    if direction == "bull":
+        stop_loss_price = entry_price * (1 - stop_loss_pct)
+    else:  # bear
+        stop_loss_price = entry_price * (1 + stop_loss_pct)
+
+    # 止盈百分比及分批出場（40% 40% 20%）
+    if base_coin == "BTC":
+        tp1_pct, tp2_pct, tp3_pct = 0.018, 0.036, 0.072
+    elif base_coin in ("ETH", "BNB"):
+        tp1_pct, tp2_pct, tp3_pct = 0.027, 0.054, 0.108
+    else:
+        tp1_pct, tp2_pct, tp3_pct = 0.045, 0.09, 0.18
+
+    # 止盈點位計算（看漲看跌反向計算）
+    if direction == "bull":
+        tp1 = entry_price * (1 + tp1_pct)
+        tp2 = entry_price * (1 + tp2_pct)
+        tp3 = entry_price * (1 + tp3_pct)
+    else:
+        tp1 = entry_price * (1 - tp1_pct)
+        tp2 = entry_price * (1 - tp2_pct)
+        tp3 = entry_price * (1 - tp3_pct)
+
+    take_profit = [
+        (tp1, 0.4),
+        (tp2, 0.4),
+        (tp3, 0.2),
+    ]
+
+    return {
+        "entry_price": round(entry_price, 4),
+        "leverage": leverage,
+        "stop_loss": round(stop_loss_price, 4),
+        "take_profit": [(round(p, 4), ratio) for p, ratio in take_profit]
+    }
 
 
 
@@ -698,14 +781,27 @@ dc = "https://discord.com/api/webhooks/1387480183698886777/RAzRv4VECjgloChid-aL0
 
 
 symbols = [
-    "BTC-USDT", "ETH-USDT", "DOT-USDT", "SOL-USDT", "XRP-USDT",
-    "AAVE-USDT", "INJ-USDT", "CRV-USDT", "LINK-USDT", "OM-USDT",
-    "CHZ-USDT","THETA-USDT","NEAR-USDT","VET-USDT","AVAX-USDT",
-    "FIL-USDT","ICP-USDT","BNB-USDT","ALGO-USDT","GRT-USDT",
-    "OP-USDT","HBAR-USDT","ARB-USDT","MANA-USDT","APT-USDT",
-    "GALA-USDT","LDO-USDT","SAND-USDT","ATOM-USDT","XLM-USDT",
-    "ADA-USDT"
-    ]
+    "BTC-USDT",      "ETH-USDT",      "DOT-USDT",      "SOL-USDT",       "XRP-USDT",
+    "AAVE-USDT",     "INJ-USDT",      "CRV-USDT",      "LINK-USDT",      "OM-USDT",
+    "CHZ-USDT",      "THETA-USDT",    "NEAR-USDT",     "VET-USDT",       "AVAX-USDT",
+    "FIL-USDT",      "ICP-USDT",      "BNB-USDT",      "ALGO-USDT",      "GRT-USDT",
+    "OP-USDT",       "HBAR-USDT",     "ARB-USDT",      "MANA-USDT",      "APT-USDT",
+    "GALA-USDT",     "LDO-USDT",      "SAND-USDT",     "ATOM-USDT",      "XLM-USDT",
+    "ADA-USDT",      "TRX-USDT",      "UNI-USDT",      "MKR-USDT",       "SNX-USDT",
+    "DYDX-USDT",     "API3-USDT",     "RUNE-USDT",     "1000PEPE-USDT",  "DOGE-USDT",
+    "SHIB-USDT",     "LUNC-USDT",     "WOO-USDT",      "BCH-USDT",       "ETC-USDT",
+    "COTI-USDT",     "BLUR-USDT",     "1INCH-USDT",    "SUI-USDT",       "KAVA-USDT",
+    "TRB-USDT",      "SFP-USDT",      "GMT-USDT",      "YGG-USDT",       "FLOW-USDT",
+    "TWT-USDT",      "KSM-USDT",      "BAT-USDT",      "CFX-USDT",       "RVN-USDT",
+    "FXS-USDT",      "STORJ-USDT",    "JOE-USDT",      "HIGH-USDT",      "ID-USDT",
+    "SSV-USDT",      "HOOK-USDT",     "RDNT-USDT",     "RENDER-USDT",    "TONCOIN-USDT",
+    "SKL-USDT",      "PHA-USDT",      "MASK-USDT",     "CELO-USDT",      "ACH-USDT",
+    "PERP-USDT",     "CVC-USDT",      "CELR-USDT",     "COMP-USDT",      "ZIL-USDT",
+    "ENJ-USDT",      "ANKR-USDT",     "GLM-USDT",      "DEGO-USDT",      "ASTR-USDT",
+    "NEO-USDT",      "MTL-USDT",      "TRU-USDT",      "BNT-USDT",       "ENA-USDT",
+    "TROLLSOL-USDT", "PI-USDT",       "VINE-USDT",     "AGT-USDT",       "PUMP-USDT",
+    "IP-USDT",       "TIA-USDT",      "PENGU-USDT",    "OL-USDT"
+]
 
 # 權重列表，對應指標順序：MA, BE_BIG, MACD, RSI, THREE, BREAK_OUT, KDJ, BOLL
 weights = [3, 4.5, 2, 2, 1, 1.5, 1,2]
@@ -757,13 +853,26 @@ async def ATR(symbol, period=14):
         return None
 
 emoji_map = {
-    "BTC": "•", "ETH": "•", "DOT": "•", "SOL": "•", "XRP": "•",
-    "AAVE": "•", "INJ": "•", "CRV": "•", "LINK": "•", "OM": "•",
-    "CHZ": "•", "THETA": "•", "NEAR": "•", "VET": "•", "AVAX": "•",
-    "FIL": "•", "ICP": "•", "BNB": "•", "ALGO": "•", "GRT": "•",
-    "OP": "•","HBAR": "•","ARB": "•","MANA": "•","APT": "•",
-    "GALA": "•","LDO": "•","SAND": "•","ATOM": "•","XLM": "•",
-    "ADA": "•"
+    "BTC": "•",        "ETH": "•",        "DOT": "•",        "SOL": "•",        "XRP": "•",
+    "AAVE": "•",       "INJ": "•",        "CRV": "•",        "LINK": "•",       "OM": "•",
+    "CHZ": "•",        "THETA": "•",      "NEAR": "•",       "VET": "•",        "AVAX": "•",
+    "FIL": "•",        "ICP": "•",        "BNB": "•",        "ALGO": "•",       "GRT": "•",
+    "OP": "•",         "HBAR": "•",       "ARB": "•",        "MANA": "•",       "APT": "•",
+    "GALA": "•",       "LDO": "•",        "SAND": "•",       "ATOM": "•",       "XLM": "•",
+    "ADA": "•",        "TRX": "•",        "UNI": "•",        "MKR": "•",        "SNX": "•",
+    "DYDX": "•",       "API3": "•",       "RUNE": "•",       "1000PEPE": "•",   "DOGE": "•",
+    "SHIB": "•",       "LUNC": "•",       "WOO": "•",        "BCH": "•",        "ETC": "•",
+    "COTI": "•",       "BLUR": "•",       "1INCH": "•",      "SUI": "•",        "KAVA": "•",
+    "TRB": "•",        "SFP": "•",        "GMT": "•",        "YGG": "•",        "FLOW": "•",
+    "TWT": "•",        "KSM": "•",        "BAT": "•",        "CFX": "•",        "RVN": "•",
+    "FXS": "•",        "STORJ": "•",      "JOE": "•",        "HIGH": "•",       "ID": "•",
+    "SSV": "•",        "HOOK": "•",       "RDNT": "•",       "RENDER": "•",     "TONCOIN": "•",
+    "SKL": "•",        "PHA": "•",        "MASK": "•",       "CELO": "•",       "ACH": "•",
+    "PERP": "•",       "CVC": "•",        "CELR": "•",       "COMP": "•",       "ZIL": "•",
+    "ENJ": "•",        "ANKR": "•",       "GLM": "•",        "DEGO": "•",       "ASTR": "•",
+    "NEO": "•",        "MTL": "•",        "TRU": "•",        "BNT": "•",        "ENA": "•",
+    "TROLLSOL": "•",   "PI": "•",         "VINE": "•",       "AGT": "•",        "PUMP": "•",
+    "IP": "•",         "TIA": "•",        "PENGU": "•",      "OL": "•"
 }
 
 async def send_to_discord(message: str):
@@ -834,7 +943,7 @@ async def evaluate_symbol_1h(symbol):
     '''atr_info = f"📏 ATR: {atr:,.3f}  " \
                f"1.5: {atr*1.5:,.3f}  " \
                f"3: {atr*3:,.3f}\n" if atr is not None else "📏 ATR: 無法計算\n"'''
-    trade_params = calculate_trade_parameters(symbol, current_price, direction, intensity)
+    trade_params = calculate_trade_parameters_1h(symbol, current_price, direction, intensity)
     if trade_params is None:
         return 0
 
@@ -927,7 +1036,7 @@ async def evaluate_symbol_15m(symbol):
     atr_info = f"📏 ATR: {atr:,.3f}  " \
                f"1.5: {atr*1.5:,.3f}  " \
                f"3: {atr*3:,.3f}\n" if atr is not None else "📏 ATR: 無法計算\n"
-    trade_params = calculate_trade_parameters(symbol, current_price, direction, intensity)
+    trade_params = calculate_trade_parameters_15m(symbol, current_price, direction, intensity)
     if trade_params is None:
         return 0
 
@@ -966,20 +1075,25 @@ async def evaluate_symbol_15m(symbol):
 async def run_loop_1h():
     await send_to_discord("💡 搜幣程式啟動！")
     while True:
+
         for sym in symbols:
             await evaluate_symbol_1h(sym)
-            await asyncio.sleep(0.3)  # 每次發完訊息後等待0.2秒，避免限速
-        print("等待 12 分鐘後重新判斷...\n")
-        await asyncio.sleep(720)  # 非同步等待12分鐘
+            await asyncio.sleep(5)
+
+        
+        '''print("等待 12 分鐘後重新判斷...\n")
+        await asyncio.sleep(720)  # 12分鐘'''
 
 async def run_loop_15m():
     while True:
+
         for sym in symbols:
             await evaluate_symbol_15m(sym)
-            await asyncio.sleep(0.3)  # 每次發完訊息後等待0.2秒，避免限速
-            
-        print("等待 3 分鐘後重新判斷...\n")
-        await asyncio.sleep(180)  # 非同步等待3分鐘
+            await asyncio.sleep(0.75)
+
+        
+        '''print("等待 3 分鐘後重新判斷...\n")
+        await asyncio.sleep(180)  # 3分鐘'''
         
 async def run_loop_forever():
     await asyncio.gather(
