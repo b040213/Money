@@ -527,7 +527,18 @@ async def BOLL(symbol, interval, period=20, std_mult=2):
     else:
         return 0
 
-
+def format_price(price: float) -> str:
+    if price >= 1:
+        return f"{price:,.2f}"
+    elif price >= 0.1:
+        return f"{price:,.4f}"
+    elif price >= 0.01:
+        return f"{price:,.5f}"
+    elif price >= 0.001:
+        return f"{price:,.6f}"
+    else:
+        return f"{price:,.7f}"
+    
 def calculate_trade_parameters_1h(symbol: str, current_price: float, direction: str, intensity: str = "normal"):
     """
     計算進場點位、槓桿倍率、止損、止盈
@@ -923,7 +934,7 @@ async def evaluate_symbol_1h(symbol):
         direction_text = "🔥🔥 📉 **強力進多** 🔥🔥"
         direction = "bull"
         intensity = "strong"
-    elif total_score >= 12.5:
+    elif total_score >= 13:
         direction_text = "📈 **看漲進場**"
         direction = "bull"
         intensity = "normal"
@@ -931,7 +942,7 @@ async def evaluate_symbol_1h(symbol):
         direction_text = "🔥🔥 📈 **強力進空** 🔥🔥"
         direction = "bear"
         intensity = "strong"
-    elif total_score <= -12.5:
+    elif total_score <= -13:
         direction_text = "📉 **看跌進場**"
         direction = "bear"
         intensity = "normal"
@@ -956,20 +967,20 @@ async def evaluate_symbol_1h(symbol):
     bingx_ratios = [40, 66, 100]  # 對應三段出場
 
     tp_str = "\n".join([
-        f"止盈{int(ratio*100)}%：${price:.2f}   🔸拉 {bingx}%"
+        f"止盈{int(ratio*100)}%：${format_price(price)}   🔸拉 {bingx}%"
         for (price, ratio), bingx in zip(take_profit, bingx_ratios)
     ])
     extra_info = (
         f"🚀 進場點位: ${entry_price}\n"
         f"🎯 槓桿倍率: {leverage}倍\n"
-        f"🛑 止損: ${stop_loss}\n"
+        f"🛑 止損: ${format_price(stop_loss)}\n"
         f"{tp_str}\n"
     )
     # 組合訊息
     message = (
         f"!!🚨注意🚨!! 🕐時區為1H🕐!!\n"
         f"{emoji} `{symbol}`\n"
-        f"💰 現價：${current_price:,.2f}\n"
+        f"💰 現價：${format_price(current_price)}\n"
         f"📊 總分：{total_score}\n"
         f"{direction_text}\n"
         f"{extra_info}"
@@ -1016,7 +1027,7 @@ async def evaluate_symbol_15m(symbol):
         direction_text = "🔥🔥 📉 **強力進多** 🔥🔥"
         direction = "bull"
         intensity = "strong"
-    elif total_score >= 11.5:
+    elif total_score >= 12:
         direction_text =  "📈 **看漲進場**"
         direction = "bull"
         intensity = "normal"
@@ -1024,7 +1035,7 @@ async def evaluate_symbol_15m(symbol):
         direction_text = "🔥🔥 📈 **強力進空** 🔥🔥"
         direction = "bear"
         intensity = "strong"
-    elif total_score <= -11.5:
+    elif total_score <= -12:
         direction_text = "📉 **看跌進場**"
         direction = "bear"
         intensity = "normal"
@@ -1049,20 +1060,20 @@ async def evaluate_symbol_15m(symbol):
     bingx_ratios = [40, 66, 100]  # 對應三段出場
 
     tp_str = "\n".join([
-        f"止盈{int(ratio*100)}%：${price:.2f}   🔸拉 {bingx}%"
+        f"止盈{int(ratio*100)}%：${format_price(price)}   🔸拉 {bingx}%"
         for (price, ratio), bingx in zip(take_profit, bingx_ratios)
     ])
     extra_info = (
         f"🚀 進場點位: ${entry_price}\n"
         f"🎯 槓桿倍率: {leverage}倍\n"
-        f"🛑 止損: ${stop_loss}\n"
+        f"🛑 止損: ${format_price(stop_loss)}\n"
         f"{tp_str}\n"
     )
     # 組合訊息
     message = (
         f"!!🚨注意🚨!!🕐時區為15m🕐!!\n"
         f"{emoji} `{symbol}`\n"
-        f"💰 現價：${current_price:,.2f}\n"
+        f"💰 現價：${format_price(current_price)}\n"
         f"📊 總分：{total_score}\n"
         f"{direction_text}\n"
         f"{extra_info}"
