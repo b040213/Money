@@ -10,9 +10,10 @@ start_time = time.time()  # 記錄啟動時間（秒）
 @app.route('/')
 def home():
     elapsed = time.time() - start_time
-    hours = int(elapsed // 3600)
+    days = int(elapsed // 86400)
+    hours = int((elapsed % 86400) // 3600)
     minutes = int((elapsed % 3600) // 60)
-    return f'幣圈監控機器人啟動中！<br>已執行 {hours} 小時 {minutes} 分鐘'
+    return f'幣圈監控機器人啟動中！<br>已執行 {days} 天 {hours} 小時 {minutes} 分鐘'
 
 # 啟動背景任務的函式
 def start_background_loop():
