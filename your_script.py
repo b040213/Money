@@ -549,7 +549,7 @@ def calculate_trade_parameters_1h(symbol: str, current_price: float, direction: 
     base_coin = symbol.split("-")[0].upper()
 
     # 進場點位百分比（BTC用0.5%，其他1%）
-    entry_pct = 0.005 if base_coin == "BTC" else 0.01
+    entry_pct = 0.004 if base_coin == "BTC" else 0.008
 
     # 進場點位計算
     if direction == "bull":
@@ -580,11 +580,11 @@ def calculate_trade_parameters_1h(symbol: str, current_price: float, direction: 
 
     # 止損百分比（看漲看跌止損方向不同，且幣別不同）
     if base_coin == "BTC":
-        stop_loss_pct = 0.02
+        stop_loss_pct = 0.016
     elif base_coin in ("ETH", "BNB"):
-        stop_loss_pct = 0.03
+        stop_loss_pct = 0.024
     else:
-        stop_loss_pct = 0.05
+        stop_loss_pct = 0.04
 
     # 止損點位計算
     if direction == "bull":
@@ -594,11 +594,11 @@ def calculate_trade_parameters_1h(symbol: str, current_price: float, direction: 
 
     # 止盈百分比及分批出場（40% 40% 20%）
     if base_coin == "BTC":
-        tp1_pct, tp2_pct, tp3_pct = 0.02, 0.04, 0.08
+        tp1_pct, tp2_pct, tp3_pct = 0.016, 0.032, 0.064
     elif base_coin in ("ETH", "BNB"):
-        tp1_pct, tp2_pct, tp3_pct = 0.03, 0.06, 0.12
+        tp1_pct, tp2_pct, tp3_pct = 0.024, 0.048, 0.096
     else:
-        tp1_pct, tp2_pct, tp3_pct = 0.05, 0.10, 0.20
+        tp1_pct, tp2_pct, tp3_pct = 0.04, 0.08, 0.16
 
     # 止盈點位計算（看漲看跌反向計算）
     if direction == "bull":
@@ -634,7 +634,7 @@ def calculate_trade_parameters_15m(symbol: str, current_price: float, direction:
     base_coin = symbol.split("-")[0].upper()
 
     # 進場點位百分比（BTC用0.5%，其他1%）
-    entry_pct = 0.005 if base_coin == "BTC" else 0.01
+    entry_pct = 0.0025 if base_coin == "BTC" else 0.005
 
     # 進場點位計算
     if direction == "bull":
@@ -665,11 +665,11 @@ def calculate_trade_parameters_15m(symbol: str, current_price: float, direction:
 
     # 止損百分比（看漲看跌止損方向不同，且幣別不同）
     if base_coin == "BTC":
-        stop_loss_pct = 0.018
+        stop_loss_pct = 0.009
     elif base_coin in ("ETH", "BNB"):
-        stop_loss_pct = 0.027
+        stop_loss_pct = 0.0135
     else:
-        stop_loss_pct = 0.045
+        stop_loss_pct = 0.0225
 
     # 止損點位計算
     if direction == "bull":
@@ -679,11 +679,11 @@ def calculate_trade_parameters_15m(symbol: str, current_price: float, direction:
 
     # 止盈百分比及分批出場（40% 40% 20%）
     if base_coin == "BTC":
-        tp1_pct, tp2_pct, tp3_pct = 0.018, 0.036, 0.072
+        tp1_pct, tp2_pct, tp3_pct = 0.009, 0.018, 0.036
     elif base_coin in ("ETH", "BNB"):
-        tp1_pct, tp2_pct, tp3_pct = 0.027, 0.054, 0.108
+        tp1_pct, tp2_pct, tp3_pct = 0.0135, 0.027, 0.54
     else:
-        tp1_pct, tp2_pct, tp3_pct = 0.045, 0.09, 0.18
+        tp1_pct, tp2_pct, tp3_pct = 0.0225, 0.045, 0.09
 
     # 止盈點位計算（看漲看跌反向計算）
     if direction == "bull":
@@ -920,7 +920,7 @@ async def evaluate_symbol_1h(symbol):
     total_score = total_score*adx
     current_price = await get_current_price(symbol)
     atr = await ATR(symbol)
-
+    atr=format_price(atr)
     # 幣名簡化
     short = symbol.split("-")[0]
     emoji = emoji_map.get(short, "")
@@ -948,7 +948,7 @@ async def evaluate_symbol_1h(symbol):
         intensity = "normal"
     else:
         return 0
-    skip_counts_1h[symbol] = 4
+    skip_counts_1h[symbol] = 8
     
     # 處理ATR顯示
     '''atr_info = f"📏 ATR: {atr:,.3f}  " \
@@ -984,6 +984,7 @@ async def evaluate_symbol_1h(symbol):
         f"📊 總分：{total_score}\n"
         f"{direction_text}\n"
         f"{extra_info}"
+        f"📏 ATR: {atr}\n"
         f"📌 進場依據：{indicators_str}"
     )
 
@@ -1013,7 +1014,7 @@ async def evaluate_symbol_15m(symbol):
     total_score = total_score*adx
     current_price = await get_current_price(symbol)
     atr = await ATR(symbol)
-
+    atr=format_price(atr)
     # 幣名簡化
     short = symbol.split("-")[0]
     emoji = emoji_map.get(short, "")
@@ -1023,30 +1024,31 @@ async def evaluate_symbol_15m(symbol):
     indicators_str = ", ".join(triggered_indicators) if triggered_indicators else "無"
 
     # 判斷進場方向
-    if total_score >= 17:
+    if total_score >= 18:
         direction_text = "🔥🔥 📉 **強力進多** 🔥🔥"
         direction = "bull"
         intensity = "strong"
-    elif total_score >= 12:
+    elif total_score >= 13:
         direction_text =  "📈 **看漲進場**"
         direction = "bull"
         intensity = "normal"
-    elif total_score <= -17:
+    elif total_score <= -18:
         direction_text = "🔥🔥 📈 **強力進空** 🔥🔥"
         direction = "bear"
         intensity = "strong"
-    elif total_score <= -12:
+    elif total_score <= -13:
         direction_text = "📉 **看跌進場**"
         direction = "bear"
         intensity = "normal"
     else:
         return 0
-    skip_counts_15m[symbol] = 4
+    skip_counts_15m[symbol] = 8
     
     # 處理ATR顯示
-    atr_info = f"📏 ATR: {atr:,.3f}  " \
+    '''atr_info = f"📏 ATR: {atr:,.3f}  " \
                f"1.5: {atr*1.5:,.3f}  " \
-               f"3: {atr*3:,.3f}\n" if atr is not None else "📏 ATR: 無法計算\n"
+               f"3: {atr*3:,.3f}\n" if atr is not None else "📏 ATR: 無法計算\n"'''
+    
     trade_params = calculate_trade_parameters_15m(symbol, current_price, direction, intensity)
     if trade_params is None:
         return 0
@@ -1077,6 +1079,7 @@ async def evaluate_symbol_15m(symbol):
         f"📊 總分：{total_score}\n"
         f"{direction_text}\n"
         f"{extra_info}"
+        f"📏 ATR: {atr}\n"
         f"📌 進場依據：{indicators_str}"
     )
 
@@ -1115,5 +1118,7 @@ async def run_loop_forever():
 if __name__ == "__main__":
     asyncio.run(run_loop_forever())
     
+
+
 
 
