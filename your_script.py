@@ -907,7 +907,7 @@ async def evaluate_symbol_1h(symbol):
         direction_text = "🔥🔥 📉 **強力進多** 🔥🔥"
         direction = "bull"
         intensity = "strong"
-    elif total_score >= 1:
+    elif total_score >= 13:
         direction_text = "📈 **看漲進場**"
         direction = "bull"
         intensity = "normal"
@@ -915,7 +915,7 @@ async def evaluate_symbol_1h(symbol):
         direction_text = "🔥🔥 📈 **強力進空** 🔥🔥"
         direction = "bear"
         intensity = "strong"
-    elif total_score <= -1:
+    elif total_score <= -13:
         direction_text = "📉 **看跌進場**"
         direction = "bear"
         intensity = "normal"
@@ -1090,3 +1090,4 @@ async def run_loop_forever():
 
 if __name__ == "__main__":
     asyncio.run(run_loop_forever())
+
