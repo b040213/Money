@@ -5,6 +5,7 @@ from bingx_py import BingXAsyncClient
 import time
 import requests
 import aiohttp
+import datetime
 
 api_key = "L9ywGJGME1uqTkIRd1Od08IvXyWCCyA2YKGwMPnde8BWOmm8gAC5xCdGAZdXFWZMt1euiT574cgAvQdQTw"
 api_secret = "NYY1OfADXhu26a6F4Tw67RbHDvJcQ2bGOcQWOI1vXccWRoutdIdfsvxyxVtdLxZAGFYn9eYZN6RX7w2fQ"
@@ -1059,6 +1060,43 @@ async def evaluate_symbol_15m(symbol):
     await send_to_discord(message)
 
 
+def get_fgi():
+    url = "https://api.alternative.me/fng/"
+    try:
+        response = requests.get(url)
+        data = response.json()
+        value = data['data'][0]['value']
+        value_classification = data['data'][0]['value_classification']
+        timestamp = data['data'][0]['timestamp']
+        readable_time = datetime.datetime.fromtimestamp(int(timestamp)).strftime('%Y-%m-%d %H:%M:%S')
+        return value, value_classification, readable_time
+    except Exception as e:
+        return None, None, None
+
+async def job():
+    value, classification, time_str = get_fgi()
+    value = float(value)
+    if value>=75:
+        msg = f"🔥 Fear & Greed Index: {value} 🔥注意風險🔥 ({classification})\n時間: {time_str}🔥注意風險🔥"
+    elif value<=25:
+        msg = f"🧊 Fear & Greed Index: {value} 🧊注意風險🧊 ({classification})\n時間: {time_str}🧊注意風險🧊"
+    elif value>25 and value<75:
+        msg = f"📊 Fear & Greed Index: {value} ({classification})\n時間: {time_str}"
+    else:
+        msg = "❌ 取得 Fear & Greed Index 失敗"
+    
+    await send_to_discord(msg)
+
+async def scheduler():
+    while True:
+        now = datetime.datetime.now()
+        target = now.replace(hour=8, minute=8, second=0, microsecond=0)
+        if now > target:
+            target += datetime.timedelta(days=1)
+        wait_seconds = (target - now).total_seconds()
+        await asyncio.sleep(wait_seconds)
+        await job()
+
 async def run_loop_1h():
     await send_to_discord("💡 搜幣程式啟動！")
     while True:
@@ -1086,8 +1124,10 @@ async def run_loop_forever():
     await asyncio.gather(
         run_loop_1h(),
         run_loop_15m(),
+        scheduler(),
     )        
 
 if __name__ == "__main__":
     asyncio.run(run_loop_forever())
+
 
