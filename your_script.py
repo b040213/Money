@@ -625,7 +625,7 @@ def calculate_trade_parameters_15m(symbol: str, current_price: float, direction:
     base_coin = symbol.split("-")[0].upper()
 
     # 進場點位百分比（BTC用0.5%，其他1%）
-    entry_pct = 0.5 * atr
+    entry_pct = 0.7 * atr
 
     # 進場點位計算
     if direction == "bull":
@@ -895,6 +895,7 @@ async def evaluate_symbol_1h(symbol):
     current_price = await get_current_price(symbol)
     atr2 = await ATR(symbol)
     atr=format_price(atr2)
+    atr_2=format_price(2*atr2)
     # 幣名簡化
     short = symbol.split("-")[0]
     emoji = emoji_map.get(short, "")
@@ -958,7 +959,7 @@ async def evaluate_symbol_1h(symbol):
         f"📊 總分：{total_score:.2f}\n"
         f"{direction_text}\n"
         f"{extra_info}"
-        f"📏 ATR: {atr}\n"
+        f"📏 ATR: {atr}  2倍ATR: {atr_2}\n"
         f"📌 進場依據：{indicators_str}"
     )
 
@@ -1129,6 +1130,7 @@ async def run_loop_forever():
 
 if __name__ == "__main__":
     asyncio.run(run_loop_forever())
+
 
 
 
