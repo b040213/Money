@@ -1060,7 +1060,7 @@ async def evaluate_symbol_15m(symbol):
     await send_to_discord(message)
 
 
-def get_fgi():
+async def get_fgi():
     url = "https://api.alternative.me/fng/"
     try:
         response = requests.get(url)
@@ -1074,7 +1074,7 @@ def get_fgi():
         return None, None, None
 
 async def job():
-    value, classification, time_str = get_fgi()
+    value, classification, time_str = await get_fgi()
     value = float(value)
     if value>=75:
         msg = f"🔥 Fear & Greed Index: {value} 🔥注意風險🔥 ({classification})\n時間: {time_str}🔥注意風險🔥"
@@ -1129,5 +1129,6 @@ async def run_loop_forever():
 
 if __name__ == "__main__":
     asyncio.run(run_loop_forever())
+
 
 
