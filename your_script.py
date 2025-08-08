@@ -779,12 +779,12 @@ symbols = [
     "TRB-USDT",      "SFP-USDT",      "GMT-USDT",      "YGG-USDT",       "FLOW-USDT",
     "TWT-USDT",      "KSM-USDT",      "BAT-USDT",      "CFX-USDT",       "RVN-USDT",
     "FXS-USDT",      "STORJ-USDT",    "JOE-USDT",      "HIGH-USDT",      "ID-USDT",
-    "SSV-USDT",      "HOOK-USDT",     "RDNT-USDT",     "RENDER-USDT",    "TONCOIN-USDT",
+    "SSV-USDT",      "HOOK-USDT",     "MYX-USDT",     "RENDER-USDT",    "TONCOIN-USDT",
     "SKL-USDT",      "PHA-USDT",      "MASK-USDT",     "CELO-USDT",      "ACH-USDT",
     "PERP-USDT",     "CVC-USDT",      "CELR-USDT",     "COMP-USDT",      "ZIL-USDT",
     "ENJ-USDT",      "ANKR-USDT",     "GLM-USDT",      "DEGO-USDT",      "ASTR-USDT",
     "NEO-USDT",      "MTL-USDT",      "TRU-USDT",      "BNT-USDT",       "ENA-USDT",
-    "TROLLSOL-USDT", "PI-USDT",       "VINE-USDT",     "AGT-USDT",       "PUMP-USDT",
+    "WLD-USDT",      "PI-USDT",       "VINE-USDT",     "AGT-USDT",       "PUMP-USDT",
     "IP-USDT",       "TIA-USDT",      "PENGU-USDT",    "OL-USDT"
 ]
 
@@ -851,12 +851,12 @@ emoji_map = {
     "TRB": "•",        "SFP": "•",        "GMT": "•",        "YGG": "•",        "FLOW": "•",
     "TWT": "•",        "KSM": "•",        "BAT": "•",        "CFX": "•",        "RVN": "•",
     "FXS": "•",        "STORJ": "•",      "JOE": "•",        "HIGH": "•",       "ID": "•",
-    "SSV": "•",        "HOOK": "•",       "RDNT": "•",       "RENDER": "•",     "TONCOIN": "•",
+    "SSV": "•",        "HOOK": "•",       "MYX": "•",       "RENDER": "•",     "TONCOIN": "•",
     "SKL": "•",        "PHA": "•",        "MASK": "•",       "CELO": "•",       "ACH": "•",
     "PERP": "•",       "CVC": "•",        "CELR": "•",       "COMP": "•",       "ZIL": "•",
     "ENJ": "•",        "ANKR": "•",       "GLM": "•",        "DEGO": "•",       "ASTR": "•",
     "NEO": "•",        "MTL": "•",        "TRU": "•",        "BNT": "•",        "ENA": "•",
-    "TROLLSOL": "•",   "PI": "•",         "VINE": "•",       "AGT": "•",        "PUMP": "•",
+    "WLD": "•",   "PI": "•",         "VINE": "•",       "AGT": "•",        "PUMP": "•",
     "IP": "•",         "TIA": "•",        "PENGU": "•",      "OL": "•"
 }
 
@@ -877,93 +877,101 @@ async def evaluate_symbol_1h(symbol):
         skip_counts_1h[symbol] -= 1
         print(f"跳過 {symbol} 偵測，剩餘跳過次數：{skip_counts_1h[symbol]}")
         return  # 不做評估
-    indicators = ['MA', 'BE_BIG', 'MACD', 'RSI', 'THREE', 'BREAK_OUT', 'KDJ','BOLL']
-    scores = [
-        await MA(symbol,interval="1h"),
-        await BE_BIG(symbol,interval="1h"),
-        await MACD(symbol,interval="1h"),
-        await RSI(symbol,interval="1h"),
-        await THREE(symbol,interval="1h"),
-        await BREAK_OUT(symbol,interval="1h"),
-        await KDJ(symbol,interval="1h"),
-        await BOLL(symbol,interval="1h")
-        
-    ]
-    total_score = sum(s * w for s, w in zip(scores, weights))
-    adx = await ADX(symbol,interval="1h")
-    total_score = total_score*adx
-    current_price = await get_current_price(symbol)
-    atr2 = await ATR(symbol)
-    atr=format_price(atr2)
-    atr_2=format_price(2*atr2)
-    # 幣名簡化
-    short = symbol.split("-")[0]
-    emoji = emoji_map.get(short, "")
-    triggered_indicators = [name for name, score in zip(indicators, scores) if score != 0]
-
-    # 轉成字串（用逗號分隔）
-    indicators_str = ", ".join(triggered_indicators) if triggered_indicators else "無"
-
-    # 判斷進場方向
-    if total_score >= 18:
-        direction_text = "🔥🔥 📉 **強力進多** 🔥🔥"
-        direction = "bull"
-        intensity = "strong"
-    elif total_score >= 13:
-        direction_text = "📈 **看漲進場**"
-        direction = "bull"
-        intensity = "normal"
-    elif total_score <= -18:
-        direction_text = "🔥🔥 📈 **強力進空** 🔥🔥"
-        direction = "bear"
-        intensity = "strong"
-    elif total_score <= -13:
-        direction_text = "📉 **看跌進場**"
-        direction = "bear"
-        intensity = "normal"
-    else:
-        return 0
-    skip_counts_1h[symbol] = 8
     
-    # 處理ATR顯示
-    '''atr_info = f"📏 ATR: {atr:,.3f}  " \
-               f"1.5: {atr*1.5:,.3f}  " \
-               f"3: {atr*3:,.3f}\n" if atr is not None else "📏 ATR: 無法計算\n"'''
-    trade_params = calculate_trade_parameters_1h(symbol, current_price, direction,atr2, intensity)
-    if trade_params is None:
-        return 0
+    try:
+        indicators = ['MA', 'BE_BIG', 'MACD', 'RSI', 'THREE', 'BREAK_OUT', 'KDJ','BOLL']
+        scores = [
+            await MA(symbol,interval="1h"),
+            await BE_BIG(symbol,interval="1h"),
+            await MACD(symbol,interval="1h"),
+            await RSI(symbol,interval="1h"),
+            await THREE(symbol,interval="1h"),
+            await BREAK_OUT(symbol,interval="1h"),
+            await KDJ(symbol,interval="1h"),
+            await BOLL(symbol,interval="1h")
+            
+        ]
+        total_score = sum(s * w for s, w in zip(scores, weights))
+        adx = await ADX(symbol,interval="1h")
+        total_score = total_score*adx
+        current_price = await get_current_price(symbol)
+        atr2 = await ATR(symbol)
+        atr=format_price(atr2)
+        atr_2=format_price(2*atr2)
+        # 幣名簡化
+        short = symbol.split("-")[0]
+        emoji = emoji_map.get(short, "")
+        triggered_indicators = [name for name, score in zip(indicators, scores) if score != 0]
 
-    entry_price = trade_params["entry_price"]
-    leverage = trade_params["leverage"]
-    stop_loss = trade_params["stop_loss"]
-    take_profit = trade_params["take_profit"]
+        # 轉成字串（用逗號分隔）
+        indicators_str = ", ".join(triggered_indicators) if triggered_indicators else "無"
 
-    # 將進場點、槓桿、止損、止盈加入訊息
-    bingx_ratios = [40, 66, 100]  # 對應三段出場
+        # 判斷進場方向
+        if total_score >= 18:
+            direction_text = "🔥🔥 📉 **強力進多** 🔥🔥"
+            direction = "bull"
+            intensity = "strong"
+        elif total_score >= 13:
+            direction_text = "📈 **看漲進場**"
+            direction = "bull"
+            intensity = "normal"
+        elif total_score <= -18:
+            direction_text = "🔥🔥 📈 **強力進空** 🔥🔥"
+            direction = "bear"
+            intensity = "strong"
+        elif total_score <= -13:
+            direction_text = "📉 **看跌進場**"
+            direction = "bear"
+            intensity = "normal"
+        else:
+            return 0
+        skip_counts_1h[symbol] = 8
+        
+        # 處理ATR顯示
+        '''atr_info = f"📏 ATR: {atr:,.3f}  " \
+                   f"1.5: {atr*1.5:,.3f}  " \
+                   f"3: {atr*3:,.3f}\n" if atr is not None else "📏 ATR: 無法計算\n"'''
+        trade_params = calculate_trade_parameters_1h(symbol, current_price, direction,atr2, intensity)
+        if trade_params is None:
+            return 0
 
-    tp_str = "\n".join([
-        f"止盈{int(ratio*100)}%：${format_price(price)}   🔸拉 {bingx}%"
-        for (price, ratio), bingx in zip(take_profit, bingx_ratios)
-    ])
-    extra_info = (
-        f"🚀 進場點位: ${entry_price}\n"
-        f"🎯 槓桿倍率: {leverage}倍\n"
-        f"🛑 止損: ${format_price(stop_loss)}\n"
-        f"{tp_str}\n"
-    )
-    # 組合訊息
-    message = (
-        f"!!🚨注意🚨!! 🕐時區為1H🕐!!\n"
-        f"{emoji} `{symbol}`\n"
-        f"💰 現價：${format_price(current_price)}\n"
-        f"📊 總分：{total_score:.2f}\n"
-        f"{direction_text}\n"
-        f"{extra_info}"
-        f"📏 ATR: {atr}  2倍ATR: {atr_2}\n"
-        f"📌 進場依據：{indicators_str}"
-    )
+        entry_price = trade_params["entry_price"]
+        leverage = trade_params["leverage"]
+        stop_loss = trade_params["stop_loss"]
+        take_profit = trade_params["take_profit"]
 
-    await send_to_discord(message)
+        # 將進場點、槓桿、止損、止盈加入訊息
+        bingx_ratios = [40, 66, 100]  # 對應三段出場
+
+        tp_str = "\n".join([
+            f"止盈{int(ratio*100)}%：${format_price(price)}   🔸拉 {bingx}%"
+            for (price, ratio), bingx in zip(take_profit, bingx_ratios)
+        ])
+        extra_info = (
+            f"🚀 進場點位: ${entry_price}\n"
+            f"🎯 槓桿倍率: {leverage}倍\n"
+            f"🛑 止損: ${format_price(stop_loss)}\n"
+            f"{tp_str}\n"
+        )
+        # 組合訊息
+        message = (
+            f"!!🚨注意🚨!! 🕐時區為1H🕐!!\n"
+            f"{emoji} `{symbol}`\n"
+            f"💰 現價：${format_price(current_price)}\n"
+            f"📊 總分：{total_score:.2f}\n"
+            f"{direction_text}\n"
+            f"{extra_info}"
+            f"📏 ATR: {atr}  2倍ATR: {atr_2}\n"
+            f"📌 進場依據：{indicators_str}"
+        )
+
+        await send_to_discord(message)
+    except Exception as e:
+        err_msg = f"❌ 幣種 `{symbol}` 評估異常，可能已下架或資料錯誤，錯誤訊息：{e}"
+        await send_to_discord(err_msg)
+
+        # 設置跳過次數為超大值，避免重複評估
+        skip_counts_1h[symbol] = 999999999
 
 
 async def evaluate_symbol_15m(symbol):
@@ -973,92 +981,100 @@ async def evaluate_symbol_15m(symbol):
         skip_counts_15m[symbol] -= 1
         print(f"跳過 {symbol} 偵測，剩餘跳過次數：{skip_counts_15m[symbol]}")
         return  # 不做評估
-    indicators = ['MA', 'BE_BIG', 'MACD', 'RSI', 'THREE', 'BREAK_OUT', 'KDJ','BOLL']
-    scores = [
-        await MA(symbol,interval="15m"),
-        await BE_BIG(symbol,interval="15m"),
-        await MACD(symbol,interval="15m"),
-        await RSI(symbol,interval="15m"),
-        await THREE(symbol,interval="15m"),
-        await BREAK_OUT(symbol,interval="15m"),
-        await KDJ(symbol,interval="15m"),
-        await BOLL(symbol,interval="15m")
-        ]
-    total_score = sum(s * w for s, w in zip(scores, weights))
-    adx = await ADX(symbol,interval="15m")
-    total_score = total_score*adx
-    current_price = await get_current_price(symbol)
-    atr2 = await ATR(symbol,period=14, timeframe="15m")
-    atr=format_price(atr2)
-    # 幣名簡化
-    short = symbol.split("-")[0]
-    emoji = emoji_map.get(short, "")
-    triggered_indicators = [name for name, score in zip(indicators, scores) if score != 0]
+    try:
+        indicators = ['MA', 'BE_BIG', 'MACD', 'RSI', 'THREE', 'BREAK_OUT', 'KDJ','BOLL']
+        scores = [
+            await MA(symbol,interval="15m"),
+            await BE_BIG(symbol,interval="15m"),
+            await MACD(symbol,interval="15m"),
+            await RSI(symbol,interval="15m"),
+            await THREE(symbol,interval="15m"),
+            await BREAK_OUT(symbol,interval="15m"),
+            await KDJ(symbol,interval="15m"),
+            await BOLL(symbol,interval="15m")
+            ]
+        total_score = sum(s * w for s, w in zip(scores, weights))
+        adx = await ADX(symbol,interval="15m")
+        total_score = total_score*adx
+        current_price = await get_current_price(symbol)
+        atr2 = await ATR(symbol,period=14, timeframe="15m")
+        atr=format_price(atr2)
+        # 幣名簡化
+        short = symbol.split("-")[0]
+        emoji = emoji_map.get(short, "")
+        triggered_indicators = [name for name, score in zip(indicators, scores) if score != 0]
 
-    # 轉成字串（用逗號分隔）
-    indicators_str = ", ".join(triggered_indicators) if triggered_indicators else "無"
+        # 轉成字串（用逗號分隔）
+        indicators_str = ", ".join(triggered_indicators) if triggered_indicators else "無"
 
-    # 判斷進場方向
-    if total_score >= 18:
-        direction_text = "🔥🔥 📉 **強力進多** 🔥🔥"
-        direction = "bull"
-        intensity = "strong"
-    elif total_score >= 13:
-        direction_text =  "📈 **看漲進場**"
-        direction = "bull"
-        intensity = "normal"
-    elif total_score <= -18:
-        direction_text = "🔥🔥 📈 **強力進空** 🔥🔥"
-        direction = "bear"
-        intensity = "strong"
-    elif total_score <= -13:
-        direction_text = "📉 **看跌進場**"
-        direction = "bear"
-        intensity = "normal"
-    else:
-        return 0
-    skip_counts_15m[symbol] = 8
-    
-    # 處理ATR顯示
-    '''atr_info = f"📏 ATR: {atr:,.3f}  " \
-               f"1.5: {atr*1.5:,.3f}  " \
-               f"3: {atr*3:,.3f}\n" if atr is not None else "📏 ATR: 無法計算\n"'''
-    
-    trade_params = calculate_trade_parameters_15m(symbol, current_price, direction, atr2, intensity)
-    if trade_params is None:
-        return 0
+        # 判斷進場方向
+        if total_score >= 18:
+            direction_text = "🔥🔥 📉 **強力進多** 🔥🔥"
+            direction = "bull"
+            intensity = "strong"
+        elif total_score >= 13:
+            direction_text =  "📈 **看漲進場**"
+            direction = "bull"
+            intensity = "normal"
+        elif total_score <= -18:
+            direction_text = "🔥🔥 📈 **強力進空** 🔥🔥"
+            direction = "bear"
+            intensity = "strong"
+        elif total_score <= -13:
+            direction_text = "📉 **看跌進場**"
+            direction = "bear"
+            intensity = "normal"
+        else:
+            return 0
+        skip_counts_15m[symbol] = 8
+        
+        # 處理ATR顯示
+        '''atr_info = f"📏 ATR: {atr:,.3f}  " \
+                   f"1.5: {atr*1.5:,.3f}  " \
+                   f"3: {atr*3:,.3f}\n" if atr is not None else "📏 ATR: 無法計算\n"'''
+        
+        trade_params = calculate_trade_parameters_15m(symbol, current_price, direction, atr2, intensity)
+        if trade_params is None:
+            return 0
 
-    entry_price = trade_params["entry_price"]
-    leverage = trade_params["leverage"]
-    stop_loss = trade_params["stop_loss"]
-    take_profit = trade_params["take_profit"]
+        entry_price = trade_params["entry_price"]
+        leverage = trade_params["leverage"]
+        stop_loss = trade_params["stop_loss"]
+        take_profit = trade_params["take_profit"]
 
-    # 將進場點、槓桿、止損、止盈加入訊息
-    bingx_ratios = [40, 66, 100]  # 對應三段出場
+        # 將進場點、槓桿、止損、止盈加入訊息
+        bingx_ratios = [40, 66, 100]  # 對應三段出場
 
-    tp_str = "\n".join([
-        f"止盈{int(ratio*100)}%：${format_price(price)}   🔸拉 {bingx}%"
-        for (price, ratio), bingx in zip(take_profit, bingx_ratios)
-    ])
-    extra_info = (
-        f"🚀 進場點位: ${entry_price}\n"
-        f"🎯 槓桿倍率: {leverage}倍\n"
-        f"🛑 止損: ${format_price(stop_loss)}\n"
-        f"{tp_str}\n"
-    )
-    # 組合訊息
-    message = (
-        f"!!🚨注意🚨!!🕐時區為15m🕐!!\n"
-        f"{emoji} `{symbol}`\n"
-        f"💰 現價：${format_price(current_price)}\n"
-        f"📊 總分：{total_score:.2f}\n"
-        f"{direction_text}\n"
-        f"{extra_info}"
-        f"📏 ATR: {atr}\n"
-        f"📌 進場依據：{indicators_str}"
-    )
+        tp_str = "\n".join([
+            f"止盈{int(ratio*100)}%：${format_price(price)}   🔸拉 {bingx}%"
+            for (price, ratio), bingx in zip(take_profit, bingx_ratios)
+        ])
+        extra_info = (
+            f"🚀 進場點位: ${entry_price}\n"
+            f"🎯 槓桿倍率: {leverage}倍\n"
+            f"🛑 止損: ${format_price(stop_loss)}\n"
+            f"{tp_str}\n"
+        )
+        # 組合訊息
+        message = (
+            f"!!🚨注意🚨!!🕐時區為15m🕐!!\n"
+            f"{emoji} `{symbol}`\n"
+            f"💰 現價：${format_price(current_price)}\n"
+            f"📊 總分：{total_score:.2f}\n"
+            f"{direction_text}\n"
+            f"{extra_info}"
+            f"📏 ATR: {atr}\n"
+            f"📌 進場依據：{indicators_str}"
+        )
 
-    await send_to_discord(message)
+        await send_to_discord(message)
+        
+    except Exception as e:
+        err_msg = f"❌ 幣種 `{symbol}` 評估異常，可能已下架或資料錯誤，錯誤訊息：{e}"
+        await send_to_discord(err_msg)
+
+        # 設置跳過次數為超大值，避免重複評估
+        skip_counts_15m[symbol] = 999999999
 
 
 async def run_loop_1h():
