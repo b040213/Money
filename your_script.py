@@ -1074,29 +1074,6 @@ async def get_fgi():
     except Exception as e:
         return None, None, None
 
-async def job():
-    value, classification, time_str = await get_fgi()
-    value = float(value)
-    if value>=75:
-        msg = f"🔥 Fear & Greed Index: {value} 🔥注意風險🔥 ({classification})\n時間: {time_str}🔥注意風險🔥"
-    elif value<=25:
-        msg = f"🧊 Fear & Greed Index: {value} 🧊注意風險🧊 ({classification})\n時間: {time_str}🧊注意風險🧊"
-    elif value>25 and value<75:
-        msg = f"📊 Fear & Greed Index: {value} ({classification})\n時間: {time_str}"
-    else:
-        msg = "❌ 取得 Fear & Greed Index 失敗"
-    
-    await send_to_discord(msg)
-
-async def scheduler():
-    while True:
-        now = datetime.datetime.now()
-        target = now.replace(hour=8, minute=8, second=0, microsecond=0)
-        if now > target:
-            target += datetime.timedelta(days=1)
-        wait_seconds = (target - now).total_seconds()
-        await asyncio.sleep(wait_seconds)
-        await job()
 
 async def run_loop_1h():
     await send_to_discord("💡 搜幣程式啟動！")
@@ -1125,7 +1102,6 @@ async def run_loop_forever():
     await asyncio.gather(
         run_loop_1h(),
         run_loop_15m(),
-        scheduler(),
     )        
 
 if __name__ == "__main__":
