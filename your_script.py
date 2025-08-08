@@ -1061,20 +1061,6 @@ async def evaluate_symbol_15m(symbol):
     await send_to_discord(message)
 
 
-async def get_fgi():
-    url = "https://api.alternative.me/fng/"
-    try:
-        response = requests.get(url)
-        data = response.json()
-        value = data['data'][0]['value']
-        value_classification = data['data'][0]['value_classification']
-        timestamp = data['data'][0]['timestamp']
-        readable_time = datetime.datetime.fromtimestamp(int(timestamp)).strftime('%Y-%m-%d %H:%M:%S')
-        return value, value_classification, readable_time
-    except Exception as e:
-        return None, None, None
-
-
 async def run_loop_1h():
     await send_to_discord("💡 搜幣程式啟動！")
     while True:
@@ -1106,6 +1092,7 @@ async def run_loop_forever():
 
 if __name__ == "__main__":
     asyncio.run(run_loop_forever())
+
 
 
 
