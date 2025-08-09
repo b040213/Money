@@ -873,17 +873,10 @@ async def send_to_discord(message: str):
 async def evaluate_symbol_1h(symbol):
 
     # 如果該幣跳過計數 > 0，直接跳過並扣減一次
-    if skip_counts_1h.get(symbol, 0) > 10:
-        err_msg = f"❌ 幣種 `{symbol}` 評估異常，可能已下架或資料錯誤，錯誤訊息：{e}"
-        await send_to_discord(err_msg)
-        return
+    
     if skip_counts_1h.get(symbol, 0) > 0:
         skip_counts_1h[symbol] -= 1
         return  # 不做評估
-
-
-
-    
     try:
         skip_counts_1h[symbol] =0
         indicators = ['MA', 'BE_BIG', 'MACD', 'RSI', 'THREE', 'BREAK_OUT', 'KDJ','BOLL']
@@ -975,14 +968,15 @@ async def evaluate_symbol_1h(symbol):
 
         await send_to_discord(message)
     except Exception as e:
-        skip_counts_1h[symbol] += 1
+        err_msg = f"❌ 幣種 `{symbol}` 評估異常，可能已下架或資料錯誤，錯誤訊息：{e}"
+        skip_counts_1h[symbol] = skip_counts_1h.get(symbol, 0) + 1
+        if skip_counts_1h.get(symbol, 0) > 10:
+            skip_counts_1h[symbol] += 99999999
+            await send_to_discord(err_msg)
+            return
 
 
 async def evaluate_symbol_15m(symbol):
-    if skip_counts_15m.get(symbol, 0) > 10:
-        err_msg = f"❌ 幣種 `{symbol}` 評估異常，可能已下架或資料錯誤，錯誤訊息：{e}"
-        await send_to_discord(err_msg)
-        return
 
     # 如果該幣跳過計數 > 0，直接跳過並扣減一次
     if skip_counts_15m.get(symbol, 0) > 0:
@@ -1079,7 +1073,12 @@ async def evaluate_symbol_15m(symbol):
         await send_to_discord(message)
         
     except Exception as e:
-        skip_counts_15m[symbol] +=1
+        err_msg = f"❌ 幣種 `{symbol}` 評估異常，可能已下架或資料錯誤，錯誤訊息：{e}"
+        skip_counts_15m[symbol] = skip_counts_15m.get(symbol, 0) + 1
+        if skip_counts_15m.get(symbol, 0) > 10:
+            skip_counts_15m[symbol] += 99999999
+            await send_to_discord(err_msg)
+            return
 
 
 async def run_loop_1h():
@@ -1113,6 +1112,7 @@ async def run_loop_forever():
 
 if __name__ == "__main__":
     asyncio.run(run_loop_forever())
+
 
 
 
