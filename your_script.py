@@ -873,12 +873,19 @@ async def send_to_discord(message: str):
 async def evaluate_symbol_1h(symbol):
 
     # 如果該幣跳過計數 > 0，直接跳過並扣減一次
+    if skip_counts_1h.get(symbol, 0) > 10:
+        err_msg = f"❌ 幣種 `{symbol}` 評估異常，可能已下架或資料錯誤，錯誤訊息：{e}"
+        await send_to_discord(err_msg)
+        return
     if skip_counts_1h.get(symbol, 0) > 0:
         skip_counts_1h[symbol] -= 1
-        print(f"跳過 {symbol} 偵測，剩餘跳過次數：{skip_counts_1h[symbol]}")
         return  # 不做評估
+
+
+
     
     try:
+        skip_counts_1h[symbol] =0
         indicators = ['MA', 'BE_BIG', 'MACD', 'RSI', 'THREE', 'BREAK_OUT', 'KDJ','BOLL']
         scores = [
             await MA(symbol,interval="1h"),
@@ -925,6 +932,7 @@ async def evaluate_symbol_1h(symbol):
             intensity = "normal"
         else:
             return 0
+            
         skip_counts_1h[symbol] = 8
         
         # 處理ATR顯示
@@ -971,10 +979,14 @@ async def evaluate_symbol_1h(symbol):
         await send_to_discord(err_msg)
 
         # 設置跳過次數為超大值，避免重複評估
-        skip_counts_1h[symbol] = 999999999
+        skip_counts_1h[symbol] += 1
 
 
 async def evaluate_symbol_15m(symbol):
+    if skip_counts_15m.get(symbol, 0) > 10:
+        err_msg = f"❌ 幣種 `{symbol}` 評估異常，可能已下架或資料錯誤，錯誤訊息：{e}"
+        await send_to_discord(err_msg)
+        return
 
     # 如果該幣跳過計數 > 0，直接跳過並扣減一次
     if skip_counts_15m.get(symbol, 0) > 0:
@@ -982,6 +994,7 @@ async def evaluate_symbol_15m(symbol):
         print(f"跳過 {symbol} 偵測，剩餘跳過次數：{skip_counts_15m[symbol]}")
         return  # 不做評估
     try:
+        skip_counts_15m[symbol] =0
         indicators = ['MA', 'BE_BIG', 'MACD', 'RSI', 'THREE', 'BREAK_OUT', 'KDJ','BOLL']
         scores = [
             await MA(symbol,interval="15m"),
@@ -1070,11 +1083,7 @@ async def evaluate_symbol_15m(symbol):
         await send_to_discord(message)
         
     except Exception as e:
-        err_msg = f"❌ 幣種 `{symbol}` 評估異常，可能已下架或資料錯誤，錯誤訊息：{e}"
-        await send_to_discord(err_msg)
-
-        # 設置跳過次數為超大值，避免重複評估
-        skip_counts_15m[symbol] = 999999999
+        skip_counts_15m[symbol] +=1
 
 
 async def run_loop_1h():
@@ -1108,6 +1117,7 @@ async def run_loop_forever():
 
 if __name__ == "__main__":
     asyncio.run(run_loop_forever())
+
 
 
 
