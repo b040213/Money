@@ -975,10 +975,6 @@ async def evaluate_symbol_1h(symbol):
 
         await send_to_discord(message)
     except Exception as e:
-        err_msg = f"❌ 幣種 `{symbol}` 評估異常，可能已下架或資料錯誤，錯誤訊息：{e}"
-        await send_to_discord(err_msg)
-
-        # 設置跳過次數為超大值，避免重複評估
         skip_counts_1h[symbol] += 1
 
 
@@ -1117,6 +1113,7 @@ async def run_loop_forever():
 
 if __name__ == "__main__":
     asyncio.run(run_loop_forever())
+
 
 
 
