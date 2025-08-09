@@ -794,6 +794,9 @@ weights = [3, 4.5, 2, 2, 1, 1.5, 1,2]
 skip_counts_1h = {}  # 全域字典，記錄幣種跳過次數
 skip_counts_15m = {}
 
+skip_counts_1h_2 = {}  # 全域字典，記錄幣種跳過次數
+skip_counts_15m_2 = {}
+
 
 async def get_current_price(symbol):
     try:
@@ -878,7 +881,7 @@ async def evaluate_symbol_1h(symbol):
         skip_counts_1h[symbol] -= 1
         return  # 不做評估
     try:
-        skip_counts_1h[symbol] =0
+        skip_counts_1h_2[symbol] =0
         indicators = ['MA', 'BE_BIG', 'MACD', 'RSI', 'THREE', 'BREAK_OUT', 'KDJ','BOLL']
         scores = [
             await MA(symbol,interval="1h"),
@@ -911,7 +914,7 @@ async def evaluate_symbol_1h(symbol):
             direction_text = "🔥🔥 📉 **強力進多** 🔥🔥"
             direction = "bull"
             intensity = "strong"
-        elif total_score >= 13:
+        elif total_score >= 14:
             direction_text = "📈 **看漲進場**"
             direction = "bull"
             intensity = "normal"
@@ -919,7 +922,7 @@ async def evaluate_symbol_1h(symbol):
             direction_text = "🔥🔥 📈 **強力進空** 🔥🔥"
             direction = "bear"
             intensity = "strong"
-        elif total_score <= -13:
+        elif total_score <= -14:
             direction_text = "📉 **看跌進場**"
             direction = "bear"
             intensity = "normal"
@@ -969,9 +972,9 @@ async def evaluate_symbol_1h(symbol):
         await send_to_discord(message)
     except Exception as e:
         err_msg = f"❌ 幣種 `{symbol}` 評估異常，可能已下架或資料錯誤，錯誤訊息：{e}"
-        skip_counts_1h[symbol] = skip_counts_1h.get(symbol, 0) + 1
-        if skip_counts_1h.get(symbol, 0) > 10:
-            skip_counts_1h[symbol] += 99999999
+        skip_counts_1h_2[symbol] = skip_counts_1h_2.get(symbol, 0) + 1
+        if skip_counts_1h_2.get(symbol, 0) > 10:
+            skip_counts_1h_2[symbol] += 99999999
             await send_to_discord(err_msg)
             return
 
@@ -984,7 +987,7 @@ async def evaluate_symbol_15m(symbol):
         print(f"跳過 {symbol} 偵測，剩餘跳過次數：{skip_counts_15m[symbol]}")
         return  # 不做評估
     try:
-        skip_counts_15m[symbol] =0
+        skip_counts_15m_2[symbol] =0
         indicators = ['MA', 'BE_BIG', 'MACD', 'RSI', 'THREE', 'BREAK_OUT', 'KDJ','BOLL']
         scores = [
             await MA(symbol,interval="15m"),
@@ -1011,19 +1014,19 @@ async def evaluate_symbol_15m(symbol):
         indicators_str = ", ".join(triggered_indicators) if triggered_indicators else "無"
 
         # 判斷進場方向
-        if total_score >= 18:
+        if total_score >= 20:
             direction_text = "🔥🔥 📉 **強力進多** 🔥🔥"
             direction = "bull"
             intensity = "strong"
-        elif total_score >= 13:
+        elif total_score >= 16:
             direction_text =  "📈 **看漲進場**"
             direction = "bull"
             intensity = "normal"
-        elif total_score <= -18:
+        elif total_score <= -20:
             direction_text = "🔥🔥 📈 **強力進空** 🔥🔥"
             direction = "bear"
             intensity = "strong"
-        elif total_score <= -13:
+        elif total_score <= -16:
             direction_text = "📉 **看跌進場**"
             direction = "bear"
             intensity = "normal"
@@ -1074,9 +1077,9 @@ async def evaluate_symbol_15m(symbol):
         
     except Exception as e:
         err_msg = f"❌ 幣種 `{symbol}` 評估異常，可能已下架或資料錯誤，錯誤訊息：{e}"
-        skip_counts_15m[symbol] = skip_counts_15m.get(symbol, 0) + 1
-        if skip_counts_15m.get(symbol, 0) > 10:
-            skip_counts_15m[symbol] += 99999999
+        skip_counts_15m_2[symbol] = skip_counts_15m_2.get(symbol, 0) + 1
+        if skip_counts_15m_2.get(symbol, 0) > 10:
+            skip_counts_15m_2[symbol] += 99999999
             await send_to_discord(err_msg)
             return
 
@@ -1112,6 +1115,7 @@ async def run_loop_forever():
 
 if __name__ == "__main__":
     asyncio.run(run_loop_forever())
+
 
 
 
