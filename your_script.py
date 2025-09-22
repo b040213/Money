@@ -769,7 +769,7 @@ symbols = [
     "BTC-USDT",      "ETH-USDT",      "DOT-USDT",      "SOL-USDT",       "XRP-USDT",
     "AAVE-USDT",     "INJ-USDT",      "CRV-USDT",      "LINK-USDT",      "OM-USDT",
     "CHZ-USDT",      "THETA-USDT",    "NEAR-USDT",     "VET-USDT",       "AVAX-USDT",
-    "FIL-USDT",      "ICP-USDT",      "BNB-USDT",      "ALGO-USDT",      "GRT-USDT",
+    "FIL-USDT",      "ICP-USDT",      "ZKC-USDT",      "ALGO-USDT",      "GRT-USDT",
     "OP-USDT",       "HBAR-USDT",     "ARB-USDT",      "MANA-USDT",      "APT-USDT",
     "GALA-USDT",     "LDO-USDT",      "SAND-USDT",     "ATOM-USDT",      "XLM-USDT",
     "ADA-USDT",      "TRX-USDT",      "UNI-USDT",      "MKR-USDT",       "SNX-USDT",
@@ -784,8 +784,8 @@ symbols = [
     "PERP-USDT",     "CVC-USDT",      "CELR-USDT",     "COMP-USDT",      "ZIL-USDT",
     "ENJ-USDT",      "ANKR-USDT",     "GLM-USDT",      "DEGO-USDT",      "ASTR-USDT",
     "NEO-USDT",      "MTL-USDT",      "TRU-USDT",      "BNT-USDT",       "ENA-USDT",
-    "WLD-USDT",      "PI-USDT",       "VINE-USDT",     "AGT-USDT",       "PUMP-USDT",
-    "IP-USDT",       "TIA-USDT",      "PENGU-USDT",    "OL-USDT"
+    "WLD-USDT",      "C-USDT",       "VINE-USDT",     "B-USDT",       "PUMP-USDT",
+    "IP-USDT",       "Q-USDT",      "M-USDT",    "W-USDT"
 ]
 
 # 權重列表，對應指標順序：MA, BE_BIG, MACD, RSI, THREE, BREAK_OUT, KDJ, BOLL
@@ -844,7 +844,7 @@ emoji_map = {
     "BTC": "•",        "ETH": "•",        "DOT": "•",        "SOL": "•",        "XRP": "•",
     "AAVE": "•",       "INJ": "•",        "CRV": "•",        "LINK": "•",       "OM": "•",
     "CHZ": "•",        "THETA": "•",      "NEAR": "•",       "VET": "•",        "AVAX": "•",
-    "FIL": "•",        "ICP": "•",        "BNB": "•",        "ALGO": "•",       "GRT": "•",
+    "FIL": "•",        "ICP": "•",        "ZKC": "•",        "ALGO": "•",       "GRT": "•",
     "OP": "•",         "HBAR": "•",       "ARB": "•",        "MANA": "•",       "APT": "•",
     "GALA": "•",       "LDO": "•",        "SAND": "•",       "ATOM": "•",       "XLM": "•",
     "ADA": "•",        "TRX": "•",        "UNI": "•",        "MKR": "•",        "SNX": "•",
@@ -859,8 +859,8 @@ emoji_map = {
     "PERP": "•",       "CVC": "•",        "CELR": "•",       "COMP": "•",       "ZIL": "•",
     "ENJ": "•",        "ANKR": "•",       "GLM": "•",        "DEGO": "•",       "ASTR": "•",
     "NEO": "•",        "MTL": "•",        "TRU": "•",        "BNT": "•",        "ENA": "•",
-    "WLD": "•",   "PI": "•",         "VINE": "•",       "AGT": "•",        "PUMP": "•",
-    "IP": "•",         "TIA": "•",        "PENGU": "•",      "OL": "•"
+    "WLD": "•",   "C": "•",         "VINE": "•",       "B": "•",        "PUMP": "•",
+    "IP": "•",         "Q": "•",        "M": "•",      "W": "•"
 }
 
 async def send_to_discord(message: str):
@@ -910,19 +910,19 @@ async def evaluate_symbol_1h(symbol):
         indicators_str = ", ".join(triggered_indicators) if triggered_indicators else "無"
 
         # 判斷進場方向
-        if total_score >= 18:
+        if total_score >= 20:
             direction_text = "🔥🔥 📉 **強力進多** 🔥🔥"
             direction = "bull"
             intensity = "strong"
-        elif total_score >= 14:
+        elif total_score >= 16:
             direction_text = "📈 **看漲進場**"
             direction = "bull"
             intensity = "normal"
-        elif total_score <= -18:
+        elif total_score <= -16:
             direction_text = "🔥🔥 📈 **強力進空** 🔥🔥"
             direction = "bear"
             intensity = "strong"
-        elif total_score <= -14:
+        elif total_score <= -20:
             direction_text = "📉 **看跌進場**"
             direction = "bear"
             intensity = "normal"
@@ -1014,19 +1014,19 @@ async def evaluate_symbol_15m(symbol):
         indicators_str = ", ".join(triggered_indicators) if triggered_indicators else "無"
 
         # 判斷進場方向
-        if total_score >= 20:
+        if total_score >= 23:
             direction_text = "🔥🔥 📉 **強力進多** 🔥🔥"
             direction = "bull"
             intensity = "strong"
-        elif total_score >= 16:
+        elif total_score >= 18:
             direction_text =  "📈 **看漲進場**"
             direction = "bull"
             intensity = "normal"
-        elif total_score <= -20:
+        elif total_score <= -23:
             direction_text = "🔥🔥 📈 **強力進空** 🔥🔥"
             direction = "bear"
             intensity = "strong"
-        elif total_score <= -16:
+        elif total_score <= -18:
             direction_text = "📉 **看跌進場**"
             direction = "bear"
             intensity = "normal"
@@ -1115,6 +1115,7 @@ async def run_loop_forever():
 
 if __name__ == "__main__":
     asyncio.run(run_loop_forever())
+
 
 
 
